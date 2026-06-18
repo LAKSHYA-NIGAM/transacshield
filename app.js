@@ -137,7 +137,13 @@
     errorsEmptyMsg: document.getElementById('errors-empty-msg'),
     errorsCapMsg: document.getElementById('errors-cap-msg'),
     errorsTotalCount: document.getElementById('errors-total-count'),
-    noValidRowsMsg: document.getElementById('no-valid-rows-msg')
+    noValidRowsMsg: document.getElementById('no-valid-rows-msg'),
+    healthBar: document.getElementById('validation-health-bar'),
+    healthBarFill: document.getElementById('validation-health-bar-fill'),
+    successBanner: document.getElementById('validation-success-banner'),
+    successText: document.getElementById('validation-success-text'),
+    timestampContainer: document.getElementById('last-validated-timestamp'),
+    timestampVal: document.getElementById('last-validated-time')
   };
 
   // ==========================================
@@ -527,7 +533,7 @@
    * Updates parsing progress UI elements.
    */
   function updateProgress(status, percentage) {
-    elements.progressStatus.textContent = status;
+    elements.progressStatus.textContent = 'Parsing rows...';
     elements.progressPercent.textContent = `${percentage}%`;
     elements.progressBarFill.style.width = `${percentage}%`;
   }
@@ -741,6 +747,72 @@
     // Reset inputs values
     elements.configForm.reset();
     updateConfigFromUI();
+
+    if (elements.healthBar) elements.healthBar.classList.add('hidden');
+    if (elements.successBanner) elements.successBanner.classList.add('hidden');
+    if (elements.timestampContainer) elements.timestampContainer.classList.add('hidden');
+  }
+
+  // ==========================================
+  // ANIMATION & POLISH HELPERS
+  // ==========================================
+  function animateCount(element, targetValue) {
+    if (element.animationFrameId) {
+      cancelAnimationFrame(element.animationFrameId);
+    }
+    const duration = 1000;
+    const startValue = 0;
+    const startTime = performance.now();
+
+    function update(currentTime) {
+      const elapsedTime = currentTime - startTime;
+      if (elapsedTime >= duration) {
+        element.textContent = targetValue.toLocaleString();
+        element.animationFrameId = null;
+      } else {
+        const progress = elapsedTime / duration;
+        const easeProgress = progress * (2 - progress);
+        const currentValue = Math.floor(startValue + (targetValue - startValue) * easeProgress);
+        element.textContent = currentValue.toLocaleString();
+        element.animationFrameId = requestAnimationFrame(update);
+      }
+    }
+    element.animationFrameId = requestAnimationFrame(update);
+  }
+
+  function updateHealthBar(summary) {
+    if (!elements.healthBar || !elements.healthBarFill) return;
+
+    if (summary.totalRows === 0) {
+      elements.healthBar.classList.add('hidden');
+      return;
+    }
+
+    const healthPct = (summary.validRows / summary.totalRows) * 100;
+    elements.healthBarFill.style.width = `${healthPct}%`;
+
+    elements.healthBarFill.classList.remove('health-green', 'health-orange', 'health-red');
+    if (healthPct > 80) {
+      elements.healthBarFill.classList.add('health-green');
+    } else if (healthPct >= 50) {
+      elements.healthBarFill.classList.add('health-orange');
+    } else {
+      elements.healthBarFill.classList.add('health-red');
+    }
+
+    elements.healthBar.classList.remove('hidden');
+  }
+
+  function updateValidationSuccessBanner(summary) {
+    if (!elements.successBanner || !elements.successText) return;
+    elements.successText.textContent = `✓ Validation complete — ${summary.validRows} rows passed, ${summary.invalidRows} failed`;
+    elements.successBanner.classList.remove('hidden');
+  }
+
+  function updateValidationTimestamp() {
+    if (!elements.timestampContainer || !elements.timestampVal) return;
+    elements.timestampVal.textContent = 'just now';
+    elements.timestampContainer.classList.remove('hidden');
   }
 
   // ==========================================
@@ -764,6 +836,11 @@
     renderErrorTable();
     generateChunks();
 
+    // Update Polish elements
+    updateHealthBar(result.summary);
+    updateValidationSuccessBanner(result.summary);
+    updateValidationTimestamp();
+
     // Handle no-valid-rows state: disable cleaned CSV button and show warning
     if (state.cleanedRows.length === 0) {
       elements.btnDownloadCleaned.disabled = true;
@@ -778,10 +855,10 @@
    * Updates validation count cards from the aggregate summary.
    */
   function updateSummaryDOM(summary) {
-    elements.statTotal.textContent = summary.totalRows.toLocaleString();
-    elements.statValid.textContent = summary.validRows.toLocaleString();
-    elements.statInvalid.textContent = summary.invalidRows.toLocaleString();
-    elements.statWarnings.textContent = summary.warningCount.toLocaleString();
+    animateCount(elements.statTotal, summary.totalRows);
+    animateCount(elements.statValid, summary.validRows);
+    animateCount(elements.statInvalid, summary.invalidRows);
+    animateCount(elements.statWarnings, summary.warningCount);
 
     // Update count in tab header
     const totalIssues = summary.errorCount + summary.warningCount;
@@ -948,41 +1025,100 @@
       elements.errorsCapMsg.classList.add('hidden');
     }
 
-    // Populate rows
+    // Group visible issues by column
+    const grouped = {};
     visibleIssues.forEach(issue => {
-      const tr = document.createElement('tr');
-      
-      const tdRow = document.createElement('td');
-      tdRow.textContent = issue.row;
-      tdRow.style.fontWeight = '600';
-      tr.appendChild(tdRow);
+      const col = issue.column || 'General';
+      if (!grouped[col]) {
+        grouped[col] = [];
+      }
+      grouped[col].push(issue);
+    });
 
-      const tdCol = document.createElement('td');
-      tdCol.textContent = issue.column;
-      tr.appendChild(tdCol);
+    // Populate rows by grouped columns
+    Object.keys(grouped).forEach(colName => {
+      const issues = grouped[colName];
+      const count = issues.length;
 
-      const tdSev = document.createElement('td');
+      // Group header row
+      const headerTr = document.createElement('tr');
+      headerTr.className = 'error-group-header active';
+
+      const tdHeader = document.createElement('td');
+      tdHeader.colSpan = 6;
+
+      const headerContent = document.createElement('div');
+      headerContent.className = 'error-group-content';
+
+      const caret = document.createElement('span');
+      caret.className = 'group-caret';
+      caret.textContent = '▼';
+
+      const label = document.createElement('span');
+      label.className = 'group-label';
+      label.textContent = colName;
+
       const badge = document.createElement('span');
-      badge.className = `badge ${issue.severity === 'ERROR' ? 'badge-error' : 'badge-warning'}`;
-      badge.textContent = issue.severity;
-      tdSev.appendChild(badge);
-      tr.appendChild(tdSev);
+      badge.className = 'group-badge';
+      badge.textContent = `${count} error${count !== 1 ? 's' : ''}`;
 
-      const tdType = document.createElement('td');
-      tdType.textContent = issue.type;
-      tdType.style.fontWeight = '550';
-      tr.appendChild(tdType);
+      headerContent.appendChild(caret);
+      headerContent.appendChild(label);
+      headerContent.appendChild(badge);
+      tdHeader.appendChild(headerContent);
+      headerTr.appendChild(tdHeader);
+      elements.errorsTableBody.appendChild(headerTr);
 
-      const tdVal = document.createElement('td');
-      tdVal.textContent = issue.value || 'N/A';
-      tdVal.style.color = 'var(--slate-600)';
-      tr.appendChild(tdVal);
+      const rows = [];
+      issues.forEach(issue => {
+        const tr = document.createElement('tr');
 
-      const tdFix = document.createElement('td');
-      tdFix.textContent = issue.suggestedFix;
-      tr.appendChild(tdFix);
+        const tdRow = document.createElement('td');
+        tdRow.textContent = issue.row;
+        tdRow.style.fontWeight = '600';
+        tr.appendChild(tdRow);
 
-      elements.errorsTableBody.appendChild(tr);
+        const tdCol = document.createElement('td');
+        tdCol.textContent = issue.column;
+        tr.appendChild(tdCol);
+
+        const tdSev = document.createElement('td');
+        const badgeSpan = document.createElement('span');
+        badgeSpan.className = `badge ${issue.severity === 'ERROR' ? 'badge-error' : 'badge-warning'}`;
+        badgeSpan.textContent = issue.severity;
+        tdSev.appendChild(badgeSpan);
+        tr.appendChild(tdSev);
+
+        const tdType = document.createElement('td');
+        tdType.textContent = issue.type;
+        tdType.style.fontWeight = '550';
+        tr.appendChild(tdType);
+
+        const tdVal = document.createElement('td');
+        tdVal.textContent = issue.value || 'N/A';
+        tdVal.style.color = 'var(--slate-600)';
+        tr.appendChild(tdVal);
+
+        const tdFix = document.createElement('td');
+        tdFix.textContent = issue.suggestedFix;
+        tr.appendChild(tdFix);
+
+        elements.errorsTableBody.appendChild(tr);
+        rows.push(tr);
+      });
+
+      // Collapse toggle event listener
+      headerTr.addEventListener('click', () => {
+        const isActive = headerTr.classList.toggle('active');
+        caret.textContent = isActive ? '▼' : '▶';
+        rows.forEach(r => {
+          if (isActive) {
+            r.classList.remove('hidden-row');
+          } else {
+            r.classList.add('hidden-row');
+          }
+        });
+      });
     });
   }
 

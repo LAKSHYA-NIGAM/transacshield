@@ -13,6 +13,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body>
+  <!-- Thin Validation Health Bar -->
+  <div id="validation-health-bar" class="validation-health-bar hidden">
+    <div id="validation-health-bar-fill" class="validation-health-bar-fill"></div>
+  </div>
 
   <!-- Header -->
   <header class="app-header">
@@ -36,6 +40,15 @@
 
   <main class="container main-content">
     
+    <!-- Validation Success Banner -->
+    <div id="validation-success-banner" class="success-banner hidden">
+      <svg class="success-banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      <span id="validation-success-text">✓ Validation complete — 0 rows passed, 0 failed</span>
+    </div>
+
     <!-- Top Configuration & Upload Section -->
     <div class="grid-twocol">
       
@@ -101,7 +114,7 @@
           <span id="upload-error-text">Only CSV files are supported.</span>
         </div>
 
-        <div id="drop-zone" class="drop-zone">
+        <div id="drop-zone" class="drop-zone pulse-animation">
           <input type="file" id="file-input" accept=".csv" class="file-input">
           <div class="drop-zone-content">
             <svg class="upload-large-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -267,8 +280,12 @@
 
         <!-- Processing Progress -->
         <div id="parsing-progress-container" class="progress-container hidden">
+          <div class="progress-status-container">
+            <div class="spinner"></div>
+            <span id="progress-status">Parsing rows...</span>
+          </div>
           <div class="progress-labels">
-            <span id="progress-status">Parsing and Validating...</span>
+            <span>Progress</span>
             <span id="progress-percent">0%</span>
           </div>
           <div class="progress-bar-bg">
@@ -327,6 +344,11 @@
           </svg>
         </div>
       </section>
+
+      <!-- Last Validated Timestamp -->
+      <div id="last-validated-timestamp" class="last-validated-timestamp hidden">
+        Last validated: <span id="last-validated-time">just now</span>
+      </div>
 
       <!-- Action Panel: Downloads and Split Chunking -->
       <section class="card action-card" aria-labelledby="action-title">
