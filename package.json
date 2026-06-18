@@ -1,0 +1,17 @@
+{
+  "name": "transacshield",
+  "version": "1.0.0",
+  "description": "Web-based transaction data validation and processing platform",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx -y http-server -p 8085 -c-1"
+  },
+  "keywords": [
+    "csv",
+    "validation",
+    "transaction",
+    "parser"
+  ],
+  "author": "Antigravity",
+  "license": "ISC"
+}
