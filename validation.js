@@ -450,13 +450,20 @@ const TransacValidationEngine = (function () {
       errorsByColumn[e.column] = (errorsByColumn[e.column] || 0) + 1;
     });
 
+    const duplicateRows = new Set(allWarnings.filter(w => w.errorCode === 'DUPLICATE_ORDER' || w.errorCode === 'DUPLICATE_PAIR').map(w => w.row)).size;
+    const phoneIssueRows = new Set(allErrors.filter(e => e.errorCode === 'INVALID_PHONE').map(e => e.row)).size;
+    const dateIssueRows = new Set(allErrors.filter(e => e.errorCode === 'INVALID_DATE').map(e => e.row)).size;
+
     const summary = {
       totalRows: rows.length,
       validRows: cleanedRows.length,
       invalidRows: uniqueInvalidRows.size,
       warningCount: allWarnings.length,
       errorCount: allErrors.length,
-      errorsByColumn
+      errorsByColumn,
+      duplicateRows,
+      phoneIssueRows,
+      dateIssueRows
     };
 
     return {

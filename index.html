@@ -8,17 +8,18 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- PapaParse CDN for robust client-side CSV parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body>
+
   <!-- Thin Validation Health Bar -->
   <div id="validation-health-bar" class="validation-health-bar hidden">
     <div id="validation-health-bar-fill" class="validation-health-bar-fill"></div>
   </div>
 
-  <!-- Header -->
+  <!-- SECTION 1: Header -->
   <header class="app-header">
     <div class="container header-container">
       <div class="logo-area">
@@ -31,28 +32,151 @@
           <p class="subtitle">Transaction Data Validation & Processing Platform</p>
         </div>
       </div>
-      <div class="badge-status">
-        <span class="pulse-dot"></span>
-        Secure Client-Side Validation
+      <div class="header-actions">
+        <div class="badge-status">
+          <span class="pulse-dot"></span>
+          Secure Client-Side Validation
+        </div>
+        <button id="hdr-btn-load-demo" class="btn btn-secondary btn-small" type="button">Load Demo Data</button>
+        <button id="hdr-btn-validate" class="btn btn-primary btn-small hidden" type="button">Validate Dataset</button>
       </div>
     </div>
   </header>
 
-  <main class="container main-content">
-    
-    <!-- Validation Success Banner -->
-    <div id="validation-success-banner" class="success-banner hidden">
-      <svg class="success-banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-        <polyline points="22 4 12 14.01 9 11.01"/>
-      </svg>
-      <span id="validation-success-text">✓ Validation complete — 0 rows passed, 0 failed</span>
-    </div>
+  <main class="main-content">
 
-    <!-- Top Configuration & Upload Section -->
-    <div class="grid-twocol">
+    <!-- SECTION 2: KPI Summary Row -->
+    <section class="kpi-summary-row container" aria-label="Key Performance Indicators">
+      <div class="kpi-cards-grid">
+        <div class="kpi-card stat-total">
+          <div class="kpi-stat-info">
+            <span class="kpi-label">Total Rows</span>
+            <span id="stat-val-total" class="kpi-number">0</span>
+          </div>
+          <svg class="kpi-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </div>
+        <div class="kpi-card stat-valid">
+          <div class="kpi-stat-info">
+            <span class="kpi-label">Valid Rows</span>
+            <span id="stat-val-valid" class="kpi-number">0</span>
+          </div>
+          <svg class="kpi-icon text-success" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <div class="kpi-card stat-invalid">
+          <div class="kpi-stat-info">
+            <span class="kpi-label">Invalid Rows</span>
+            <span id="stat-val-invalid" class="kpi-number">0</span>
+          </div>
+          <svg class="kpi-icon text-danger" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+        </div>
+        <div class="kpi-card stat-chunks">
+          <div class="kpi-stat-info">
+            <span class="kpi-label">Chunks Generated</span>
+            <span id="stat-val-chunks" class="kpi-number">0</span>
+          </div>
+          <svg class="kpi-icon text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>
+          </svg>
+        </div>
+        <div class="kpi-card stat-score">
+          <div class="kpi-stat-info">
+            <span class="kpi-label">Success Rate</span>
+            <span id="stat-val-score" class="kpi-number">0%</span>
+          </div>
+          <svg class="kpi-icon text-warning" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          </svg>
+        </div>
+      </div>
+      <!-- Last Validated Timestamp -->
+      <div id="last-validated-timestamp" class="last-validated-timestamp hidden">
+        Last validated: <span id="last-validated-time">just now</span>
+      </div>
+    </section>
+
+    <!-- SECTION 3: Main Workspace (Two-Column Layout) -->
+    <div class="grid-twocol container">
       
-      <!-- Configuration Panel -->
+      <!-- Left Column: File Upload Section -->
+      <section class="card upload-card" aria-labelledby="upload-title">
+        <h2 id="upload-title" class="card-title">
+          <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Dataset Upload
+        </h2>
+        <div id="upload-error" class="inline-error-banner hidden">
+          <svg class="error-banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span id="upload-error-text">Only CSV files are supported.</span>
+        </div>
+
+        <div id="drop-zone" class="drop-zone pulse-animation">
+          <input type="file" id="file-input" accept=".csv" class="file-input">
+          <div class="drop-zone-content">
+            <svg class="upload-large-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <path d="M12 18v-6"/>
+              <path d="m9 15 3-3 3 3"/>
+            </svg>
+            <p class="drop-prompt">Drag & drop your CSV file here or <span class="browse-link">browse</span></p>
+            <p class="drop-constraints">Only CSV files (Max 50MB) encoded in UTF-8</p>
+          </div>
+        </div>
+
+        <div id="demo-loader-container" class="demo-loader-container">
+          <div class="or-separator"><span>OR</span></div>
+          <button id="btn-load-sample" class="btn btn-secondary btn-small" type="button">Load Demo Transactions</button>
+        </div>
+
+        <div id="file-info" class="file-info hidden">
+          <div class="file-meta">
+            <svg class="file-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <div class="file-text-details" style="flex-grow: 1;">
+              <p id="file-name" class="file-name">filename.csv</p>
+              <p id="file-size" class="file-size">0 KB</p>
+              <p class="file-headers-detail" style="font-size: 0.75rem; color: var(--slate-500); margin-top: 0.25rem; white-space: normal; word-break: break-all;">
+                Detected Headers: <span id="info-headers" style="font-weight: 550; color: var(--slate-700);">None</span>
+              </p>
+            </div>
+            <div style="margin-left: auto; font-size: 0.8rem; font-weight: 600; color: var(--slate-600); white-space: nowrap;">
+              Total Rows (Raw): <span id="info-row-count">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Processing Progress -->
+        <div id="parsing-progress-container" class="progress-container hidden">
+          <div class="progress-status-container">
+            <div class="spinner"></div>
+            <span id="progress-status">Parsing rows...</span>
+          </div>
+          <div class="progress-labels">
+            <span>Progress</span>
+            <span id="progress-percent">0%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Validation Engine Configuration -->
       <section class="card config-card" aria-labelledby="config-title">
         <h2 id="config-title" class="card-title">
           <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -94,322 +218,197 @@
           </div>
         </form>
       </section>
+    </div>
 
-      <!-- Upload Panel -->
-      <section class="card upload-card" aria-labelledby="upload-title">
-        <h2 id="upload-title" class="card-title">
+    <!-- Review Container (Visible only when file is active) -->
+    <div id="workspace-review-container" class="container hidden">
+      
+      <!-- SECTION 4: Column Mapping Section -->
+      <section class="card mapping-card" aria-labelledby="mapping-title">
+        <h2 id="mapping-title" class="card-title">
           <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
+            <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
           </svg>
-          Dataset Upload
+          CSV Header Schema Mapping
         </h2>
-        <div id="upload-error" class="inline-error-banner hidden">
-          <svg class="error-banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
+        <p class="desc-text" style="margin-bottom: 1.25rem;">Align standard validation schema fields with your uploaded CSV columns. Type hints are auto-guessed below.</p>
+        
+        <div class="mapping-grid">
+          <!-- Expected Field: Order ID (Required) -->
+          <div class="mapping-row">
+            <div class="mapping-field-info">
+              <label for="map-order-id" class="mapping-field-label">Order ID <span class="required-asterisk">*</span></label>
+              <span id="guess-order-id" class="guess-badge">Guessing...</span>
+            </div>
+            <select id="map-order-id" class="mapping-select"></select>
+          </div>
+
+          <!-- Expected Field: Product ID -->
+          <div class="mapping-row">
+            <div class="mapping-field-info">
+              <label for="map-product-id" class="mapping-field-label">Product ID</label>
+              <span id="guess-product-id" class="guess-badge">Guessing...</span>
+            </div>
+            <select id="map-product-id" class="mapping-select"></select>
+          </div>
+
+          <!-- Expected Field: Phone -->
+          <div class="mapping-row">
+            <div class="mapping-field-info">
+              <label for="map-phone" class="mapping-field-label">Customer Phone</label>
+              <span id="guess-phone" class="guess-badge">Guessing...</span>
+            </div>
+            <select id="map-phone" class="mapping-select"></select>
+          </div>
+
+          <!-- Expected Field: Country -->
+          <div class="mapping-row">
+            <div class="mapping-field-info">
+              <label for="map-country" class="mapping-field-label">Country Code</label>
+              <span id="guess-country" class="guess-badge">Guessing...</span>
+            </div>
+            <select id="map-country" class="mapping-select"></select>
+          </div>
+
+          <!-- Expected Field: DateTime -->
+          <div class="mapping-row">
+            <div class="mapping-field-info">
+              <label for="map-datetime" class="mapping-field-label">Order Date & Time</label>
+              <span id="guess-datetime" class="guess-badge">Guessing...</span>
+            </div>
+            <select id="map-datetime" class="mapping-select"></select>
+          </div>
+
+          <!-- Expected Field: Payment Mode -->
+          <div class="mapping-row">
+            <div class="mapping-field-info">
+              <label for="map-payment" class="mapping-field-label">Payment Mode</label>
+              <span id="guess-payment" class="guess-badge">Guessing...</span>
+            </div>
+            <select id="map-payment" class="mapping-select"></select>
+          </div>
+
+          <!-- Expected Field: Amount -->
+          <div class="mapping-row">
+            <div class="mapping-field-info">
+              <label for="map-amount" class="mapping-field-label">Transaction Amount</label>
+              <span id="guess-amount" class="guess-badge">Guessing...</span>
+            </div>
+            <select id="map-amount" class="mapping-select"></select>
+          </div>
+
+          <!-- Expected Field: Email -->
+          <div class="mapping-row">
+            <div class="mapping-field-info">
+              <label for="map-email" class="mapping-field-label">Customer Email</label>
+              <span id="guess-email" class="guess-badge">Guessing...</span>
+            </div>
+            <select id="map-email" class="mapping-select"></select>
+          </div>
+        </div>
+
+        <div id="mapping-warning-card" class="mapping-warning-card">
+          <p class="mapping-warning-text">⚠️ <strong>Order ID mapping is required.</strong> Select a column or bypass below.</p>
+          <label class="checkbox-container">
+            <input type="checkbox" id="bypass-required-check">
+            <span>Bypass missing Order ID rule (Validate available fields)</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- SECTION 5: Data Preview Section -->
+      <section class="card preview-card" aria-labelledby="preview-title">
+        <h2 id="preview-title" class="card-title">
+          <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
           </svg>
-          <span id="upload-error-text">Only CSV files are supported.</span>
+          Raw CSV Data Preview (First 10 Rows)
+        </h2>
+        <div class="table-container small-table-container">
+          <table class="data-table raw-preview-table">
+            <thead>
+              <tr id="raw-preview-header-row"></tr>
+            </thead>
+            <tbody id="raw-preview-body-rows"></tbody>
+          </table>
         </div>
+      </section>
 
-        <div id="drop-zone" class="drop-zone pulse-animation">
-          <input type="file" id="file-input" accept=".csv" class="file-input">
-          <div class="drop-zone-content">
-            <svg class="upload-large-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <path d="M12 18v-6"/>
-              <path d="m9 15 3-3 3 3"/>
-            </svg>
-            <p class="drop-prompt">Drag & drop your CSV file here or <span class="browse-link">browse</span></p>
-            <p class="drop-constraints">Only CSV files (Max 50MB) encoded in UTF-8</p>
+      <!-- SECTION 6: Validation Action Bar -->
+      <section class="card validation-action-bar-card">
+        <div class="action-bar-flex">
+          <div class="action-bar-text">
+            <h3>Ready for validation?</h3>
+            <p>Process your CSV data through the TransacShield validation engine.</p>
           </div>
-        </div>
-
-        <div id="demo-loader-container" class="demo-loader-container">
-          <div class="or-separator"><span>OR</span></div>
-          <button id="btn-load-sample" class="btn btn-secondary btn-small" type="button">Load Demo Transactions</button>
-        </div>
-
-        <div id="file-info" class="file-info hidden">
-          <!-- File Details -->
-          <div class="file-meta">
-            <svg class="file-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-            <div class="file-text-details" style="flex-grow: 1;">
-              <p id="file-name" class="file-name">filename.csv</p>
-              <p id="file-size" class="file-size">0 KB</p>
-              <p class="file-headers-detail" style="font-size: 0.75rem; color: var(--slate-500); margin-top: 0.25rem; white-space: normal; word-break: break-all;">
-                Detected Headers: <span id="info-headers" style="font-weight: 550; color: var(--slate-700);">None</span>
-              </p>
-            </div>
-            <div style="margin-left: auto; font-size: 0.8rem; font-weight: 600; color: var(--slate-600); white-space: nowrap;">
-              Total Rows (Raw): <span id="info-row-count">0</span>
-            </div>
-          </div>
-
-          <!-- Column Mapping Workspace -->
-          <div class="mapping-workspace">
-            <h3 class="mapping-workspace-title">CSV Column Header Mapping</h3>
-            <p class="mapping-workspace-desc">Map standard validation fields to your CSV columns. System will guess data types to help you align.</p>
-            
-            <div class="mapping-grid">
-              <!-- Expected Field: Order ID (Required) -->
-              <div class="mapping-row">
-                <div class="mapping-field-info">
-                  <label for="map-order-id" class="mapping-field-label">Order ID <span class="required-asterisk">*</span></label>
-                  <span id="guess-order-id" class="guess-badge">Guessing...</span>
-                </div>
-                <select id="map-order-id" class="mapping-select">
-                  <!-- CSV Headers loaded dynamically -->
-                </select>
-              </div>
-
-              <!-- Expected Field: Product ID -->
-              <div class="mapping-row">
-                <div class="mapping-field-info">
-                  <label for="map-product-id" class="mapping-field-label">Product ID</label>
-                  <span id="guess-product-id" class="guess-badge">Guessing...</span>
-                </div>
-                <select id="map-product-id" class="mapping-select">
-                  <!-- CSV Headers loaded dynamically -->
-                </select>
-              </div>
-
-              <!-- Expected Field: Phone -->
-              <div class="mapping-row">
-                <div class="mapping-field-info">
-                  <label for="map-phone" class="mapping-field-label">Customer Phone</label>
-                  <span id="guess-phone" class="guess-badge">Guessing...</span>
-                </div>
-                <select id="map-phone" class="mapping-select">
-                  <!-- CSV Headers loaded dynamically -->
-                </select>
-              </div>
-
-              <!-- Expected Field: Country -->
-              <div class="mapping-row">
-                <div class="mapping-field-info">
-                  <label for="map-country" class="mapping-field-label">Country Code (Row-level)</label>
-                  <span id="guess-country" class="guess-badge">Guessing...</span>
-                </div>
-                <select id="map-country" class="mapping-select">
-                  <!-- CSV Headers loaded dynamically -->
-                </select>
-              </div>
-
-              <!-- Expected Field: DateTime -->
-              <div class="mapping-row">
-                <div class="mapping-field-info">
-                  <label for="map-datetime" class="mapping-field-label">Order Date & Time</label>
-                  <span id="guess-datetime" class="guess-badge">Guessing...</span>
-                </div>
-                <select id="map-datetime" class="mapping-select">
-                  <!-- CSV Headers loaded dynamically -->
-                </select>
-              </div>
-
-              <!-- Expected Field: Payment Mode -->
-              <div class="mapping-row">
-                <div class="mapping-field-info">
-                  <label for="map-payment" class="mapping-field-label">Payment Mode</label>
-                  <span id="guess-payment" class="guess-badge">Guessing...</span>
-                </div>
-                <select id="map-payment" class="mapping-select">
-                  <!-- CSV Headers loaded dynamically -->
-                </select>
-              </div>
-
-              <!-- Expected Field: Amount -->
-              <div class="mapping-row">
-                <div class="mapping-field-info">
-                  <label for="map-amount" class="mapping-field-label">Transaction Amount</label>
-                  <span id="guess-amount" class="guess-badge">Guessing...</span>
-                </div>
-                <select id="map-amount" class="mapping-select">
-                  <!-- CSV Headers loaded dynamically -->
-                </select>
-              </div>
-            </div>
-
-            <!-- Warning and confirmation checkbox -->
-            <div id="mapping-warning-card" class="mapping-warning-card">
-              <p class="mapping-warning-text">⚠️ <strong>Order ID mapping is required.</strong> Select a column or check the box to confirm it is missing from this file.</p>
-              <label class="checkbox-container">
-                <input type="checkbox" id="bypass-required-check">
-                <span>Confirm Order ID is missing from dataset (Validate anyway)</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Raw Data Preview (First 10 rows) -->
-          <div class="raw-preview-workspace">
-            <h3 class="mapping-workspace-title">Raw CSV Data Preview (First 10 rows)</h3>
-            <div class="table-container small-table-container">
-              <table class="data-table raw-preview-table">
-                <thead>
-                  <tr id="raw-preview-header-row">
-                    <!-- Dynamic Headers -->
-                  </tr>
-                </thead>
-                <tbody id="raw-preview-body-rows">
-                  <!-- Dynamic Rows -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="upload-action-bar">
-            <button id="btn-reset" class="btn btn-secondary btn-small btn-remove-file" type="button">
-              <svg class="btn-icon-small" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="action-bar-buttons">
+            <button id="btn-reset" class="btn btn-secondary btn-remove-file" type="button">
+              <svg class="btn-icon-small" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
-              Remove file
+              Remove File
             </button>
-            <div class="validation-trigger-buttons">
-              <button id="btn-validate-only" class="btn btn-secondary" type="button" disabled>Validate only</button>
-              <button id="btn-validate-generate" class="btn btn-primary" type="button" disabled>Validate and generate cleaned output</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Processing Progress -->
-        <div id="parsing-progress-container" class="progress-container hidden">
-          <div class="progress-status-container">
-            <div class="spinner"></div>
-            <span id="progress-status">Parsing rows...</span>
-          </div>
-          <div class="progress-labels">
-            <span>Progress</span>
-            <span id="progress-percent">0%</span>
-          </div>
-          <div class="progress-bar-bg">
-            <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+            <button id="btn-validate-only" class="btn btn-secondary" type="button">Validate Only</button>
+            <button id="btn-validate-generate" class="btn btn-primary" type="button">Validate & Generate Output</button>
           </div>
         </div>
       </section>
     </div>
 
     <!-- Active State: Validation Dashboard -->
-    <div id="dashboard-section" class="dashboard-section hidden">
+    <div id="dashboard-section" class="dashboard-section container hidden">
       
-      <!-- Validation Summary Cards -->
-      <section class="summary-cards" aria-label="Validation Metrics">
-        <div class="card summary-card stat-total">
-          <div class="stat-content">
-            <p class="stat-label">Total Rows</p>
-            <p id="stat-val-total" class="stat-number">0</p>
-          </div>
-          <svg class="stat-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 6h16M4 12h16M4 18h16"/>
-          </svg>
-        </div>
-
-        <div class="card summary-card stat-valid">
-          <div class="stat-content">
-            <p class="stat-label">Valid Rows (Cleaned)</p>
-            <p id="stat-val-valid" class="stat-number">0</p>
-          </div>
-          <svg class="stat-icon text-success" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        </div>
-
-        <div class="card summary-card stat-invalid">
-          <div class="stat-content">
-            <p class="stat-label">Invalid Rows</p>
-            <p id="stat-val-invalid" class="stat-number">0</p>
-          </div>
-          <svg class="stat-icon text-danger" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="15" y1="9" x2="9" y2="15"/>
-            <line x1="9" y1="9" x2="15" y2="15"/>
-          </svg>
-        </div>
-
-        <div class="card summary-card stat-warnings">
-          <div class="stat-content">
-            <p class="stat-label">Warnings / Duplicates</p>
-            <p id="stat-val-warnings" class="stat-number">0</p>
-          </div>
-          <svg class="stat-icon text-warning" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-        </div>
-      </section>
-
-      <!-- Last Validated Timestamp -->
-      <div id="last-validated-timestamp" class="last-validated-timestamp hidden">
-        Last validated: <span id="last-validated-time">just now</span>
+      <!-- Validation Success Banner -->
+      <div id="validation-success-banner" class="success-banner hidden">
+        <svg class="success-banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <span id="validation-success-text">✓ Validation complete</span>
       </div>
 
-      <!-- Action Panel: Downloads and Split Chunking -->
-      <section class="card action-card" aria-labelledby="action-title">
-        <h2 id="action-title" class="card-title">Export & Processing Actions</h2>
-        
-        <div id="download-locked-banner" class="inline-error-banner hidden" style="margin-bottom: 1rem; background-color: var(--slate-100); border-color: var(--slate-200); color: var(--slate-600);">
-          <svg class="error-banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
+      <!-- SECTION 7: Validation Results Section -->
+      <section class="card results-breakdown-card" aria-labelledby="results-title">
+        <h2 id="results-title" class="card-title">
+          <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
           </svg>
-          <span>Exports are locked. Run "Validate and generate cleaned output" to enable file downloads.</span>
-        </div>
-
-        <div class="action-flex-container">
-          <div class="main-downloads">
-            <h3>Standard Downloads</h3>
-            <div class="btn-group-actions">
-              <div class="download-item">
-                <button id="btn-download-cleaned" class="btn btn-primary">
-                  <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                  Download Cleaned CSV
-                </button>
-                <p class="download-hint">Contains only rows that passed all validations, with trimmed strings, normalized phone numbers, and standardized payment mode casing.</p>
-              </div>
-              <div class="download-item">
-                <button id="btn-download-report" class="btn btn-secondary">
-                  <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="16" y1="13" x2="8" y2="13"/>
-                    <line x1="16" y1="17" x2="8" y2="17"/>
-                    <polyline points="10 9 9 9 8 9"/>
-                  </svg>
-                  Download Validation Report
-                </button>
-                <p class="download-hint">Contains all rows (valid + invalid) with three appended columns: Validation_Status, Validation_Errors, and Validation_Warnings.</p>
-              </div>
-            </div>
-            <div id="no-valid-rows-msg" class="no-valid-rows-msg hidden">
-              <svg class="btn-icon-small" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              No valid rows exist. All records failed validation — cleaned CSV download is disabled.
-            </div>
+          Validation Results Breakdown
+        </h2>
+        <div class="results-grid">
+          <div class="result-mini-card">
+            <span class="result-label">Checked Rows</span>
+            <span id="res-val-checked" class="result-number">0</span>
           </div>
-          
-          <div class="chunking-downloads">
-            <h3>Cleaned File Chunking</h3>
-            <p class="desc-text">Split valid records into smaller files for batch processing. (Current limit: <span id="chunk-display-count">1000</span> rows/file)</p>
-            <div id="chunk-status-msg" class="chunk-status-msg">No chunks generated yet.</div>
-            <div id="chunk-buttons-container" class="chunk-buttons-container">
-              <!-- Dynamically generated chunk download buttons -->
-            </div>
+          <div class="result-mini-card pass-card">
+            <span class="result-label">Passed Rows (Clean)</span>
+            <span id="res-val-passed" class="result-number text-success">0</span>
+          </div>
+          <div class="result-mini-card fail-card">
+            <span class="result-label">Failed Rows (Errors)</span>
+            <span id="res-val-failed" class="result-number text-danger">0</span>
+          </div>
+          <div class="result-mini-card warning-card">
+            <span class="result-label">Warning Rows</span>
+            <span id="res-val-warnings" class="result-number text-warning">0</span>
+          </div>
+          <div class="result-mini-card duplicate-card">
+            <span class="result-label">Duplicate Rows</span>
+            <span id="res-val-duplicates" class="result-number text-orange">0</span>
+          </div>
+          <div class="result-mini-card phone-card">
+            <span class="result-label">Phone Issues</span>
+            <span id="res-val-phone-issues" class="result-number text-danger">0</span>
+          </div>
+          <div class="result-mini-card date-card">
+            <span class="result-label">Date/Time Issues</span>
+            <span id="res-val-date-issues" class="result-number text-danger">0</span>
           </div>
         </div>
       </section>
 
-      <!-- Preview and Error Tabs section -->
+      <!-- SECTION 8: Error Insights Section -->
       <section class="card tabs-card">
         <div class="tab-headers">
           <button id="tab-btn-preview" class="tab-btn active">
@@ -426,13 +425,9 @@
             <div class="table-container">
               <table id="preview-table" class="data-table">
                 <thead>
-                  <tr id="preview-table-header">
-                    <!-- Dynamic Headers -->
-                  </tr>
+                  <tr id="preview-table-header"></tr>
                 </thead>
-                <tbody id="preview-table-body">
-                  <!-- Dynamic Rows -->
-                </tbody>
+                <tbody id="preview-table-body"></tbody>
               </table>
             </div>
             <div id="preview-empty-msg" class="empty-state-msg hidden">
@@ -445,8 +440,7 @@
             <div class="error-controls">
               <div class="search-box">
                 <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"/>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 </svg>
                 <input type="text" id="error-search" placeholder="Search errors by row, column, type, or suggested fix...">
               </div>
@@ -462,7 +456,6 @@
                 <label for="error-column-filter">Column:</label>
                 <select id="error-column-filter">
                   <option value="ALL">All Columns</option>
-                  <!-- Populated dynamically -->
                 </select>
               </div>
             </div>
@@ -479,15 +472,12 @@
                     <th>Suggested Fix</th>
                   </tr>
                 </thead>
-                <tbody id="errors-table-body">
-                  <!-- Dynamic Error Logs -->
-                </tbody>
+                <tbody id="errors-table-body"></tbody>
               </table>
             </div>
             <div id="errors-empty-msg" class="empty-state-msg empty-state-success">
-              <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
+              <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
               No errors or warnings found! Your data is 100% clean.
             </div>
@@ -498,7 +488,85 @@
         </div>
       </section>
 
+      <!-- SECTION 9: Output / Export Center -->
+      <section class="card action-card" aria-labelledby="action-title">
+        <h2 id="action-title" class="card-title">Output & Export Center</h2>
+        
+        <div id="download-locked-banner" class="inline-error-banner hidden" style="margin-bottom: 1rem; background-color: var(--slate-100); border-color: var(--slate-200); color: var(--slate-600);">
+          <svg class="error-banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>Exports are locked. Run "Validate & Generate Output" to enable file downloads.</span>
+        </div>
+
+        <div class="action-flex-container">
+          <div class="main-downloads">
+            <h3>Standard Downloads</h3>
+            <div class="btn-group-actions">
+              <div class="download-item">
+                <button id="btn-download-cleaned" class="btn btn-primary">
+                  <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Download Cleaned CSV
+                </button>
+                <p class="download-hint">Contains only rows that passed all validations, with normalized values.</p>
+              </div>
+              <div class="download-item">
+                <button id="btn-download-report" class="btn btn-secondary">
+                  <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                  </svg>
+                  Download Validation Report
+                </button>
+                <p class="download-hint">Contains all rows with appended Validation_Status, Validation_Errors, and Validation_Warnings columns.</p>
+              </div>
+            </div>
+            <div id="no-valid-rows-msg" class="no-valid-rows-msg hidden">
+              <svg class="btn-icon-small" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              No valid rows exist. All records failed validation — cleaned CSV download is disabled.
+            </div>
+          </div>
+          
+          <div class="chunking-downloads">
+            <h3>Cleaned File Chunking</h3>
+            <p class="desc-text">Split valid records into smaller files. (Limit: <span id="chunk-display-count">1000</span> rows/file)</p>
+            <div id="chunk-status-msg" class="chunk-status-msg">No chunks generated yet.</div>
+            <div id="chunk-buttons-container" class="chunk-buttons-container"></div>
+          </div>
+        </div>
+      </section>
+
     </div>
+
+    <!-- SECTION 10: Recent Jobs / Activity Panel -->
+    <section class="recent-jobs-section container">
+      <div class="card recent-jobs-card">
+        <h2 class="card-title">
+          <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/>
+          </svg>
+          Recent Activity & Job Logs
+        </h2>
+        <p class="desc-text" style="margin-bottom: 1.25rem;">Track status, row counts, and health scores of recent validations run in this session.</p>
+        <div class="table-container">
+          <table class="data-table recent-jobs-table">
+            <thead>
+              <tr>
+                <th>Dataset Filename</th>
+                <th>Validated At</th>
+                <th>Total Records</th>
+                <th>Validation Status</th>
+                <th>Success Rate (%)</th>
+              </tr>
+            </thead>
+            <tbody id="recent-jobs-body">
+              <!-- Prepopulated mock or session logs -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
   </main>
 
@@ -508,9 +576,7 @@
       <div class="about-card">
         <h2 class="about-title">
           <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="16" x2="12" y2="12"/>
-            <line x1="12" y1="8" x2="12.01" y2="8"/>
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
           </svg>
           About This Validator
         </h2>
@@ -523,6 +589,7 @@
               <li>Payment modes against a configurable allowed-values list</li>
               <li>Amounts as non-negative numeric values</li>
               <li>Required fields (order ID) and duplicate detection</li>
+              <li>Email fields for standard syntactic formats</li>
             </ul>
           </div>
           <div class="about-block">

@@ -22,7 +22,8 @@
       country: '',
       datetime: '',
       payment_mode: '',
-      amount: ''
+      amount: '',
+      email: ''
     },
     config: {
       countryPhoneRule: 'IN',
@@ -38,7 +39,8 @@
     columnTypes: {}, // Stores detected type guesses
     cleanedRows: [],     // Valid normalized rows (0 errors)
     filteredErrors: [],  // Errors list after search / filters
-    activeTab: 'preview' // 'preview' or 'errors'
+    activeTab: 'preview', // 'preview' or 'errors'
+    recentJobs: [] // Stores job logs
   };
 
   // ==========================================
@@ -60,6 +62,7 @@
     mapDatetime: document.getElementById('map-datetime'),
     mapAmount: document.getElementById('map-amount'),
     mapPayment: document.getElementById('map-payment'),
+    mapEmail: document.getElementById('map-email'),
 
     // Guess badges
     guessOrderId: document.getElementById('guess-order-id'),
@@ -69,6 +72,7 @@
     guessDatetime: document.getElementById('guess-datetime'),
     guessPayment: document.getElementById('guess-payment'),
     guessAmount: document.getElementById('guess-amount'),
+    guessEmail: document.getElementById('guess-email'),
 
     // Warning and bypass
     mappingWarningCard: document.getElementById('mapping-warning-card'),
@@ -104,11 +108,21 @@
     // Dashboard
     dashboardSection: document.getElementById('dashboard-section'),
     
-    // Summary metrics
+    // Summary metrics (KPI Summary Row)
     statTotal: document.getElementById('stat-val-total'),
     statValid: document.getElementById('stat-val-valid'),
     statInvalid: document.getElementById('stat-val-invalid'),
-    statWarnings: document.getElementById('stat-val-warnings'),
+    statChunks: document.getElementById('stat-val-chunks'),
+    statScore: document.getElementById('stat-val-score'),
+
+    // Detailed results breakdown
+    resValChecked: document.getElementById('res-val-checked'),
+    resValPassed: document.getElementById('res-val-passed'),
+    resValFailed: document.getElementById('res-val-failed'),
+    resValWarnings: document.getElementById('res-val-warnings'),
+    resValDuplicates: document.getElementById('res-val-duplicates'),
+    resValPhoneIssues: document.getElementById('res-val-phone-issues'),
+    resValDateIssues: document.getElementById('res-val-date-issues'),
 
     // Actions
     btnDownloadCleaned: document.getElementById('btn-download-cleaned'),
@@ -143,7 +157,17 @@
     successBanner: document.getElementById('validation-success-banner'),
     successText: document.getElementById('validation-success-text'),
     timestampContainer: document.getElementById('last-validated-timestamp'),
-    timestampVal: document.getElementById('last-validated-time')
+    timestampVal: document.getElementById('last-validated-time'),
+
+    // Header & actions buttons
+    hdrBtnLoadDemo: document.getElementById('hdr-btn-load-demo'),
+    hdrBtnValidate: document.getElementById('hdr-btn-validate'),
+    workspaceReviewContainer: document.getElementById('workspace-review-container'),
+    btnActionLoadDemo: document.getElementById('btn-action-load-demo'),
+    btnActionReset: document.getElementById('btn-action-reset'),
+    btnActionValidate: document.getElementById('btn-action-validate'),
+    btnActionGenerate: document.getElementById('btn-action-generate'),
+    recentJobsBody: document.getElementById('recent-jobs-body')
   };
 
   // ==========================================
@@ -200,6 +224,15 @@
               updateConfigFromUI();
               
               elements.dashboardSection.classList.add('hidden');
+              if (elements.workspaceReviewContainer) {
+                elements.workspaceReviewContainer.classList.remove('hidden');
+              }
+              if (elements.hdrBtnValidate) {
+                elements.hdrBtnValidate.classList.remove('hidden');
+              }
+              if (elements.hdrBtnLoadDemo) {
+                elements.hdrBtnLoadDemo.classList.add('hidden');
+              }
             }, 300);
           },
           error: function(err) {
@@ -310,10 +343,19 @@
 
     // 8. Demo Loader
     elements.btnLoadSample.addEventListener('click', loadSampleData);
+    if (elements.hdrBtnLoadDemo) elements.hdrBtnLoadDemo.addEventListener('click', loadSampleData);
+    if (elements.btnActionLoadDemo) elements.btnActionLoadDemo.addEventListener('click', loadSampleData);
 
     // 9. Validation Triggers
     elements.btnValidateOnly.addEventListener('click', () => handleValidationTrigger(true));
     elements.btnValidateGenerate.addEventListener('click', () => handleValidationTrigger(false));
+    if (elements.hdrBtnValidate) elements.hdrBtnValidate.addEventListener('click', () => handleValidationTrigger(true));
+    if (elements.btnActionValidate) elements.btnActionValidate.addEventListener('click', () => handleValidationTrigger(true));
+    if (elements.btnActionGenerate) elements.btnActionGenerate.addEventListener('click', () => handleValidationTrigger(false));
+
+    // Reset bindings
+    elements.btnReset.addEventListener('click', resetDashboard);
+    if (elements.btnActionReset) elements.btnActionReset.addEventListener('click', resetDashboard);
 
     // 10. Central Column Mapping change handlers
     const mappingSelects = [
@@ -323,20 +365,23 @@
       { element: elements.mapCountry, field: 'country' },
       { element: elements.mapDatetime, field: 'datetime' },
       { element: elements.mapPayment, field: 'payment_mode' },
-      { element: elements.mapAmount, field: 'amount' }
+      { element: elements.mapAmount, field: 'amount' },
+      { element: elements.mapEmail, field: 'email' }
     ];
 
     mappingSelects.forEach(mapping => {
-      mapping.element.addEventListener('change', () => {
-        state.mappings[mapping.field] = mapping.element.value;
-        updateGuessBadges();
-        checkRequiredMappings();
-        
-        // Re-run validation automatically if dashboard is active
-        if (state.rawRows.length > 0 && !elements.dashboardSection.classList.contains('hidden')) {
-          runValidation();
-        }
-      });
+      if (mapping.element) {
+        mapping.element.addEventListener('change', () => {
+          state.mappings[mapping.field] = mapping.element.value;
+          updateGuessBadges();
+          checkRequiredMappings();
+          
+          // Re-run validation automatically if dashboard is active
+          if (state.rawRows.length > 0 && !elements.dashboardSection.classList.contains('hidden')) {
+            runValidation();
+          }
+        });
+      }
     });
 
     elements.bypassRequiredCheck.addEventListener('change', () => {
@@ -371,6 +416,7 @@
     state.mappings.datetime = elements.mapDatetime.value;
     state.mappings.payment_mode = elements.mapPayment.value;
     state.mappings.amount = elements.mapAmount.value;
+    state.mappings.email = elements.mapEmail.value;
   }
 
   /**
@@ -471,6 +517,16 @@
           
           // Hide dashboard until validated
           elements.dashboardSection.classList.add('hidden');
+
+          if (elements.workspaceReviewContainer) {
+            elements.workspaceReviewContainer.classList.remove('hidden');
+          }
+          if (elements.hdrBtnValidate) {
+            elements.hdrBtnValidate.classList.remove('hidden');
+          }
+          if (elements.hdrBtnLoadDemo) {
+            elements.hdrBtnLoadDemo.classList.add('hidden');
+          }
         }, 300);
       },
       error: function (error) {
@@ -558,7 +614,8 @@
       country: ['country', 'country_code', 'countrycode', 'nation', 'region'],
       datetime: ['date', 'timestamp', 'time', 'created_at', 'order_date', 'datetime', 'date_time', 'time_stamp'],
       amount: ['amount', 'price', 'total', 'value', 'order_amount', 'cost', 'sales'],
-      payment_mode: ['payment_mode', 'paymentmode', 'payment_method', 'paymentmethod', 'payment', 'mode', 'method', 'pay_mode']
+      payment_mode: ['payment_mode', 'paymentmode', 'payment_method', 'paymentmethod', 'payment', 'mode', 'method', 'pay_mode'],
+      email: ['email', 'email_address', 'mail', 'e-mail', 'customer_email', 'contact_email']
     };
 
     // Assign mapped fields
@@ -568,6 +625,7 @@
     state.mappings.country = findMatch(mapDict.country) || '';
     state.mappings.datetime = findMatch(mapDict.datetime) || findMatch(['date', 'time']) || '';
     state.mappings.amount = findMatch(mapDict.amount) || '';
+    state.mappings.email = findMatch(mapDict.email) || '';
     
     // Avoid double mapping the order_id if product_id fell back to headers[0]
     if (state.mappings.product_id === state.mappings.order_id) {
@@ -577,9 +635,6 @@
     state.mappings.payment_mode = findMatch(mapDict.payment_mode) || '';
   }
 
-  /**
-   * Populates the mapping dropdown selects with CSV headers options.
-   */
   function populateMappingDropdowns() {
     const mappingSelects = [
       elements.mapOrderId,
@@ -588,29 +643,28 @@
       elements.mapCountry,
       elements.mapDatetime,
       elements.mapPayment,
-      elements.mapAmount
+      elements.mapAmount,
+      elements.mapEmail
     ];
 
     mappingSelects.forEach(select => {
-      // Clear options
-      select.innerHTML = '';
-      
-      // Default skip option
-      const defaultOpt = document.createElement('option');
-      defaultOpt.value = '';
-      defaultOpt.textContent = '-- Skip Column --';
-      select.appendChild(defaultOpt);
+      if (select) {
+        select.innerHTML = '';
+        
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = '-- Skip Column --';
+        select.appendChild(defaultOpt);
 
-      // Populate headers
-      state.rawHeaders.forEach(header => {
-        const opt = document.createElement('option');
-        opt.value = header;
-        opt.textContent = header;
-        select.appendChild(opt);
-      });
+        state.rawHeaders.forEach(header => {
+          const opt = document.createElement('option');
+          opt.value = header;
+          opt.textContent = header;
+          select.appendChild(opt);
+        });
+      }
     });
 
-    // Select auto-detected fields
     elements.mapOrderId.value = state.mappings.order_id;
     elements.mapProductId.value = state.mappings.product_id;
     elements.mapPhone.value = state.mappings.phone;
@@ -618,11 +672,9 @@
     elements.mapDatetime.value = state.mappings.datetime;
     elements.mapPayment.value = state.mappings.payment_mode;
     elements.mapAmount.value = state.mappings.amount;
+    elements.mapEmail.value = state.mappings.email;
   }
 
-  /**
-   * Updates the inline guess badges showing data types.
-   */
   function updateGuessBadges() {
     const fields = [
       { select: elements.mapOrderId, badge: elements.guessOrderId },
@@ -631,49 +683,54 @@
       { select: elements.mapCountry, badge: elements.guessCountry },
       { select: elements.mapDatetime, badge: elements.guessDatetime },
       { select: elements.mapPayment, badge: elements.guessPayment },
-      { select: elements.mapAmount, badge: elements.guessAmount }
+      { select: elements.mapAmount, badge: elements.guessAmount },
+      { select: elements.mapEmail, badge: elements.guessEmail }
     ];
 
     fields.forEach(f => {
-      const selectedCol = f.select.value;
-      if (selectedCol) {
-        const guessedType = state.columnTypes[selectedCol] || 'Text';
-        f.badge.textContent = `Guessed: ${guessedType}`;
-        f.badge.style.opacity = '1';
-      } else {
-        f.badge.textContent = 'Skipped';
-        f.badge.style.opacity = '0.5';
+      if (f.select && f.badge) {
+        const selectedCol = f.select.value;
+        if (selectedCol) {
+          const guessedType = state.columnTypes[selectedCol] || 'Text';
+          f.badge.textContent = `Guessed: ${guessedType}`;
+          f.badge.style.opacity = '1';
+        } else {
+          f.badge.textContent = 'Skipped';
+          f.badge.style.opacity = '0.5';
+        }
       }
     });
   }
 
-  /**
-   * Checks mapping requirements (order_id) and locks/unlocks validate buttons.
-   */
   function checkRequiredMappings() {
     const orderIdMapped = elements.mapOrderId.value !== '';
     const bypassChecked = elements.bypassRequiredCheck.checked;
     
     const warningCard = elements.mappingWarningCard;
 
+    const setDisabled = (val) => {
+      if (elements.btnValidateOnly) elements.btnValidateOnly.disabled = val;
+      if (elements.btnValidateGenerate) elements.btnValidateGenerate.disabled = val;
+      if (elements.hdrBtnValidate) elements.hdrBtnValidate.disabled = val;
+      if (elements.btnActionValidate) elements.btnActionValidate.disabled = val;
+      if (elements.btnActionGenerate) elements.btnActionGenerate.disabled = val;
+    };
+
     if (orderIdMapped) {
       warningCard.classList.add('valid-state');
       warningCard.querySelector('.mapping-warning-text').innerHTML = 
         '✅ <strong>Required fields mapped.</strong> Ready to proceed with validation.';
-      elements.btnValidateOnly.disabled = false;
-      elements.btnValidateGenerate.disabled = false;
+      setDisabled(false);
     } else if (bypassChecked) {
       warningCard.classList.add('valid-state');
       warningCard.querySelector('.mapping-warning-text').innerHTML = 
         'ℹ️ <strong>Bypassed Order ID mapping.</strong> Order ID format validation will be skipped.';
-      elements.btnValidateOnly.disabled = false;
-      elements.btnValidateGenerate.disabled = false;
+      setDisabled(false);
     } else {
       warningCard.classList.remove('valid-state');
       warningCard.querySelector('.mapping-warning-text').innerHTML = 
         '⚠️ <strong>Order ID mapping is required.</strong> Select a column or check the box to confirm it is missing from this file.';
-      elements.btnValidateOnly.disabled = true;
-      elements.btnValidateGenerate.disabled = true;
+      setDisabled(true);
     }
   }
 
@@ -732,8 +789,8 @@
     
     elements.fileInput.value = '';
     elements.bypassRequiredCheck.checked = false;
-    elements.btnValidateOnly.disabled = true;
-    elements.btnValidateGenerate.disabled = true;
+    if (elements.btnValidateOnly) elements.btnValidateOnly.disabled = true;
+    if (elements.btnValidateGenerate) elements.btnValidateGenerate.disabled = true;
 
     elements.fileInfo.classList.add('hidden');
     elements.dropZone.classList.remove('hidden');
@@ -744,6 +801,17 @@
     elements.parsingProgressContainer.classList.add('hidden');
     clearUploadError();
 
+    // Hide Review Workspace
+    if (elements.workspaceReviewContainer) {
+      elements.workspaceReviewContainer.classList.add('hidden');
+    }
+    if (elements.hdrBtnValidate) {
+      elements.hdrBtnValidate.classList.add('hidden');
+    }
+    if (elements.hdrBtnLoadDemo) {
+      elements.hdrBtnLoadDemo.classList.remove('hidden');
+    }
+
     // Reset inputs values
     elements.configForm.reset();
     updateConfigFromUI();
@@ -751,12 +819,20 @@
     if (elements.healthBar) elements.healthBar.classList.add('hidden');
     if (elements.successBanner) elements.successBanner.classList.add('hidden');
     if (elements.timestampContainer) elements.timestampContainer.classList.add('hidden');
+
+    // Reset KPI Row to 0 values
+    animateCount(elements.statTotal, 0);
+    animateCount(elements.statValid, 0);
+    animateCount(elements.statInvalid, 0);
+    animateCount(elements.statChunks, 0);
+    animateScore(elements.statScore, 0);
   }
 
   // ==========================================
   // ANIMATION & POLISH HELPERS
   // ==========================================
   function animateCount(element, targetValue) {
+    if (!element) return;
     if (element.animationFrameId) {
       cancelAnimationFrame(element.animationFrameId);
     }
@@ -774,6 +850,31 @@
         const easeProgress = progress * (2 - progress);
         const currentValue = Math.floor(startValue + (targetValue - startValue) * easeProgress);
         element.textContent = currentValue.toLocaleString();
+        element.animationFrameId = requestAnimationFrame(update);
+      }
+    }
+    element.animationFrameId = requestAnimationFrame(update);
+  }
+
+  function animateScore(element, targetValue) {
+    if (!element) return;
+    if (element.animationFrameId) {
+      cancelAnimationFrame(element.animationFrameId);
+    }
+    const duration = 1000;
+    const startValue = 0;
+    const startTime = performance.now();
+
+    function update(currentTime) {
+      const elapsedTime = currentTime - startTime;
+      if (elapsedTime >= duration) {
+        element.textContent = `${targetValue.toFixed(1)}%`;
+        element.animationFrameId = null;
+      } else {
+        const progress = elapsedTime / duration;
+        const easeProgress = progress * (2 - progress);
+        const currentValue = startValue + (targetValue - startValue) * easeProgress;
+        element.textContent = `${currentValue.toFixed(1)}%`;
         element.animationFrameId = requestAnimationFrame(update);
       }
     }
@@ -815,6 +916,45 @@
     elements.timestampContainer.classList.remove('hidden');
   }
 
+  function renderRecentJobs() {
+    if (!elements.recentJobsBody) return;
+    elements.recentJobsBody.innerHTML = '';
+
+    state.recentJobs.forEach(job => {
+      const tr = document.createElement('tr');
+
+      const tdFile = document.createElement('td');
+      tdFile.textContent = job.fileName;
+      tdFile.style.fontWeight = '600';
+      tr.appendChild(tdFile);
+
+      const tdTime = document.createElement('td');
+      tdTime.textContent = job.timestamp;
+      tdTime.style.color = 'var(--slate-500)';
+      tr.appendChild(tdTime);
+
+      const tdRows = document.createElement('td');
+      tdRows.textContent = job.rowsProcessed.toLocaleString();
+      tr.appendChild(tdRows);
+
+      const tdStatus = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className = `job-status-badge ${
+        job.validationStatus === 'COMPLETED' ? 'badge-completed' : 'badge-completed-errors'
+      }`;
+      badge.textContent = job.validationStatus;
+      tdStatus.appendChild(badge);
+      tr.appendChild(tdStatus);
+
+      const tdRate = document.createElement('td');
+      tdRate.textContent = job.successRate;
+      tdRate.style.fontWeight = '600';
+      tr.appendChild(tdRate);
+
+      elements.recentJobsBody.appendChild(tr);
+    });
+  }
+
   // ==========================================
   // VALIDATION & CLEANING RUNNER
   // ==========================================
@@ -836,17 +976,40 @@
     renderErrorTable();
     generateChunks();
 
+    // Update Detailed Results Breakdown
+    if (elements.resValChecked) elements.resValChecked.textContent = result.summary.totalRows.toLocaleString();
+    if (elements.resValPassed) elements.resValPassed.textContent = result.summary.validRows.toLocaleString();
+    if (elements.resValFailed) elements.resValFailed.textContent = result.summary.invalidRows.toLocaleString();
+    if (elements.resValWarnings) elements.resValWarnings.textContent = result.summary.warningCount.toLocaleString();
+    if (elements.resValDuplicates) elements.resValDuplicates.textContent = result.summary.duplicateRows.toLocaleString();
+    if (elements.resValPhoneIssues) elements.resValPhoneIssues.textContent = result.summary.phoneIssueRows.toLocaleString();
+    if (elements.resValDateIssues) elements.resValDateIssues.textContent = result.summary.dateIssueRows.toLocaleString();
+
     // Update Polish elements
     updateHealthBar(result.summary);
     updateValidationSuccessBanner(result.summary);
     updateValidationTimestamp();
 
+    // Update Recent Jobs log
+    const now = new Date();
+    const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const successPct = result.summary.totalRows > 0 ? (result.summary.validRows / result.summary.totalRows) * 100 : 0;
+    const newJob = {
+      fileName: state.file ? state.file.name : 'sample_transactions.csv',
+      timestamp: timeString,
+      rowsProcessed: result.summary.totalRows,
+      validationStatus: result.summary.invalidRows > 0 ? 'COMPLETED WITH ISSUES' : 'COMPLETED',
+      successRate: `${successPct.toFixed(1)}%`
+    };
+    state.recentJobs.unshift(newJob);
+    renderRecentJobs();
+
     // Handle no-valid-rows state: disable cleaned CSV button and show warning
     if (state.cleanedRows.length === 0) {
-      elements.btnDownloadCleaned.disabled = true;
+      if (elements.btnDownloadCleaned) elements.btnDownloadCleaned.disabled = true;
       if (elements.noValidRowsMsg) elements.noValidRowsMsg.classList.remove('hidden');
     } else {
-      elements.btnDownloadCleaned.disabled = false;
+      if (elements.btnDownloadCleaned) elements.btnDownloadCleaned.disabled = false;
       if (elements.noValidRowsMsg) elements.noValidRowsMsg.classList.add('hidden');
     }
   }
@@ -858,7 +1021,14 @@
     animateCount(elements.statTotal, summary.totalRows);
     animateCount(elements.statValid, summary.validRows);
     animateCount(elements.statInvalid, summary.invalidRows);
-    animateCount(elements.statWarnings, summary.warningCount);
+    
+    const validCount = summary.validRows;
+    const chunkSize = state.config.chunkSize;
+    const numChunks = validCount > 0 ? (validCount <= chunkSize ? 1 : Math.ceil(validCount / chunkSize)) : 0;
+    animateCount(elements.statChunks, numChunks);
+
+    const successPct = summary.totalRows > 0 ? (summary.validRows / summary.totalRows) * 100 : 0;
+    animateScore(elements.statScore, successPct);
 
     // Update count in tab header
     const totalIssues = summary.errorCount + summary.warningCount;
@@ -1268,6 +1438,30 @@
   // INITIALIZE APP
   // ==========================================
   document.addEventListener('DOMContentLoaded', () => {
+    state.recentJobs = [
+      {
+        fileName: 'mock_billing_may.csv',
+        timestamp: '11:15 AM',
+        rowsProcessed: 12450,
+        validationStatus: 'COMPLETED',
+        successRate: '100.0%'
+      },
+      {
+        fileName: 'legacy_users_v2.csv',
+        timestamp: '09:30 AM',
+        rowsProcessed: 8500,
+        validationStatus: 'COMPLETED WITH ISSUES',
+        successRate: '91.2%'
+      },
+      {
+        fileName: 'sales_export_temp.csv',
+        timestamp: 'Yesterday',
+        rowsProcessed: 4200,
+        validationStatus: 'COMPLETED WITH ISSUES',
+        successRate: '78.4%'
+      }
+    ];
+    renderRecentJobs();
     initEvents();
     updateConfigFromUI();
   });

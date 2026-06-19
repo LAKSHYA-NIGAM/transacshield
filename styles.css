@@ -524,47 +524,44 @@ body {
   transition: width 0.15s ease;
 }
 
-/* 6. Dashboard: Metrics Summary Cards */
-.dashboard-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  animation: fadeIn 0.35s ease;
+/* 6. Dashboard: KPI Summary Row & Results Grid */
+.kpi-summary-row {
+  margin-top: 1.5rem;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.summary-cards {
+.kpi-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
 }
 
-.summary-card {
+.kpi-card {
+  background-color: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.25rem;
   position: relative;
   overflow: hidden;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.summary-card:nth-child(1) { animation-delay: 0.05s; }
-.summary-card:nth-child(2) { animation-delay: 0.10s; }
-.summary-card:nth-child(3) { animation-delay: 0.15s; }
-.summary-card:nth-child(4) { animation-delay: 0.20s; }
+.kpi-card:nth-child(1) { animation-delay: 0.05s; }
+.kpi-card:nth-child(2) { animation-delay: 0.10s; }
+.kpi-card:nth-child(3) { animation-delay: 0.15s; }
+.kpi-card:nth-child(4) { animation-delay: 0.20s; }
+.kpi-card:nth-child(5) { animation-delay: 0.25s; }
 
-.summary-card:hover {
+.kpi-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
 }
 
-.summary-card::before {
+.kpi-card::before {
   content: "";
   position: absolute;
   top: 0;
@@ -573,37 +570,33 @@ body {
   height: 100%;
 }
 
-.stat-total {
-  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+.kpi-card.stat-total { background: linear-gradient(135deg, #f8fafc, #f1f5f9); }
+.kpi-card.stat-valid { background: linear-gradient(135deg, #f0fdf4, #dcfce7); }
+.kpi-card.stat-invalid { background: linear-gradient(135deg, #fef2f2, #fee2e2); }
+.kpi-card.stat-chunks { background: linear-gradient(135deg, #eff6ff, #dbeafe); }
+.kpi-card.stat-score { background: linear-gradient(135deg, #fffbeb, #fef3c7); }
+
+.kpi-card.stat-total::before { background-color: var(--slate-400); }
+.kpi-card.stat-valid::before { background-color: var(--success); }
+.kpi-card.stat-invalid::before { background-color: var(--danger); }
+.kpi-card.stat-chunks::before { background-color: var(--primary); }
+.kpi-card.stat-score::before { background-color: var(--warning); }
+
+.kpi-stat-info {
+  display: flex;
+  flex-direction: column;
 }
 
-.stat-valid {
-  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
-}
-
-.stat-invalid {
-  background: linear-gradient(135deg, #fef2f2, #fee2e2);
-}
-
-.stat-warnings {
-  background: linear-gradient(135deg, #fffbeb, #fef3c7);
-}
-
-.stat-total::before { background-color: var(--slate-400); }
-.stat-valid::before { background-color: var(--success); }
-.stat-invalid::before { background-color: var(--danger); }
-.stat-warnings::before { background-color: var(--warning); }
-
-.stat-label {
-  font-size: 0.775rem;
+.kpi-label {
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--slate-500);
 }
 
-.stat-number {
-  font-size: 2.6rem;
+.kpi-number {
+  font-size: 2.2rem;
   font-weight: 800;
   color: var(--slate-900);
   line-height: 1.2;
@@ -611,39 +604,185 @@ body {
   transition: all 0.3s ease;
 }
 
-.stat-valid .stat-number {
-  color: #16a34a;
+.kpi-card.stat-valid .kpi-number { color: #16a34a; }
+.kpi-card.stat-invalid .kpi-number { color: #dc2626; }
+.kpi-card.stat-chunks .kpi-number { color: #2563eb; }
+.kpi-card.stat-score .kpi-number { color: #d97706; }
+
+.kpi-icon {
+  width: 2rem;
+  height: 2rem;
+  color: var(--slate-400);
+  opacity: 0.8;
 }
 
-.stat-invalid .stat-number {
-  color: #dc2626;
+.kpi-card.stat-valid .kpi-icon { color: var(--success); }
+.kpi-card.stat-invalid .kpi-icon { color: var(--danger); }
+.kpi-card.stat-chunks .kpi-icon { color: var(--primary); }
+.kpi-card.stat-score .kpi-icon { color: var(--warning); }
+
+/* Detailed Results Breakdown Section */
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.875rem;
+  margin-top: 0.5rem;
 }
 
-.stat-warnings .stat-number {
-  color: #d97706;
+.result-mini-card {
+  background-color: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-sm);
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.stat-icon {
-  width: 2.25rem;
-  height: 2.25rem;
-  color: var(--slate-300);
-  opacity: 0.75;
+.result-mini-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
 
-.stat-valid .stat-icon {
+.result-mini-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: var(--slate-300);
+}
+
+.result-mini-card.pass-card::before { background-color: var(--success); }
+.result-mini-card.fail-card::before { background-color: var(--danger); }
+.result-mini-card.warning-card::before { background-color: var(--warning); }
+.result-mini-card.duplicate-card::before { background-color: #f97316; }
+.result-mini-card.phone-card::before { background-color: var(--danger); }
+.result-mini-card.date-card::before { background-color: var(--danger); }
+
+.result-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--slate-500);
+  letter-spacing: 0.025em;
+}
+
+.result-number {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--slate-800);
+}
+
+/* Action Bar Flex Container */
+.validation-action-bar-card {
+  margin-top: 1.5rem;
+  border-left: 4px solid var(--primary);
+}
+
+.action-bar-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .action-bar-flex {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.action-bar-text h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--slate-900);
+}
+
+.action-bar-text p {
+  font-size: 0.8rem;
+  color: var(--slate-500);
+  margin-top: 0.125rem;
+}
+
+.action-bar-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Header Action Buttons */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+@media (max-width: 600px) {
+  .header-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Recent Jobs Activity Panel */
+.recent-jobs-section {
+  margin-top: 2rem;
+}
+
+.recent-jobs-card {
+  border-top: 3px solid var(--slate-400);
+}
+
+.recent-jobs-table {
+  width: 100%;
+  font-size: 0.825rem;
+}
+
+.recent-jobs-table th {
+  background-color: var(--slate-50);
+  color: var(--slate-600);
+  font-weight: 600;
+}
+
+.recent-jobs-table td {
+  color: var(--slate-800);
+}
+
+.job-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.badge-completed {
+  background-color: var(--success-light);
   color: var(--success);
-  opacity: 1;
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
-.stat-invalid .stat-icon {
-  color: var(--danger);
-  opacity: 1;
-}
-
-.stat-warnings .stat-icon {
+.badge-completed-errors {
+  background-color: var(--warning-light);
   color: var(--warning);
-  opacity: 1;
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
+
+.text-orange { color: #f97316; }
 
 @keyframes slideInUp {
   from {
@@ -656,9 +795,6 @@ body {
   }
 }
 
-.text-success { color: var(--success); }
-.text-danger { color: var(--danger); }
-.text-warning { color: var(--warning); }
 
 /* 7. Action Panel (Download / Chunking) */
 .action-card h3 {
