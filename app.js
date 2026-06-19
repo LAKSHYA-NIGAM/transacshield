@@ -8,7 +8,9 @@
 (function () {
   'use strict';
 
-  const API_BASE = window.location.port === '3001' ? '/api' : 'http://localhost:3001/api';
+  const API_BASE = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3001' 
+    : 'https://transacshield-production.up.railway.app';
 
   // ==========================================
   // STATE MANAGEMENT
@@ -1497,7 +1499,7 @@
       issues
     };
 
-    fetch(`${API_BASE}/runs`, {
+    fetch(API_BASE + '/api/runs', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -1529,7 +1531,7 @@
     if (emptyMsg) emptyMsg.classList.add('hidden');
 
     // 1. Fetch Aggregated statistics
-    fetch(`${API_BASE}/stats`)
+    fetch(API_BASE + '/api/stats')
       .then(res => res.json())
       .then(stats => {
         const filesEl = document.getElementById('history-stat-files');
@@ -1543,7 +1545,7 @@
       .catch(err => console.error('Error loading history statistics:', err));
 
     // 2. Fetch recent validation runs list
-    fetch(`${API_BASE}/runs`)
+    fetch(API_BASE + '/api/runs')
       .then(res => res.json())
       .then(runs => {
         if (skeleton) skeleton.classList.add('hidden');
@@ -1675,7 +1677,7 @@
     if (panel) panel.classList.add('open');
     if (overlay) overlay.classList.add('open');
 
-    fetch(`${API_BASE}/runs/${runId}`)
+    fetch(API_BASE + '/api/runs/' + runId)
       .then(res => {
         if (!res.ok) throw new Error('Run record not found');
         return res.json();
@@ -1775,7 +1777,7 @@
   }
 
   function deleteRun(runId) {
-    fetch(`${API_BASE}/runs/${runId}`, {
+    fetch(API_BASE + '/api/runs/' + runId, {
       method: 'DELETE'
     })
       .then(res => res.json())

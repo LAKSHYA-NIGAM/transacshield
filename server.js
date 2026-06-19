@@ -9,7 +9,13 @@ const app = express();
 const PORT = 3001;
 
 // Middlewares
-app.use(cors({ origin: 'http://localhost:8085' }));
+app.use(cors({
+  origin: [
+    'http://localhost:8085',
+    'https://transacshield.vercel.app',
+    'https://transacshield-production.up.railway.app'
+  ]
+}));
 app.use(compression());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
