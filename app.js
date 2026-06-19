@@ -8,6 +8,8 @@
 (function () {
   'use strict';
 
+  const API_BASE = window.location.port === '3001' ? '/api' : 'http://localhost:3001/api';
+
   // ==========================================
   // STATE MANAGEMENT
   // ==========================================
@@ -387,6 +389,20 @@
     elements.bypassRequiredCheck.addEventListener('change', () => {
       checkRequiredMappings();
     });
+
+    // Details panel close events
+    const closeBtn = document.getElementById('panel-close-btn');
+    const overlay = document.getElementById('details-overlay');
+    const panel = document.getElementById('details-panel');
+
+    if (closeBtn && overlay && panel) {
+      const closePanel = () => {
+        panel.classList.remove('open');
+        overlay.classList.remove('open');
+      };
+      closeBtn.addEventListener('click', closePanel);
+      overlay.addEventListener('click', closePanel);
+    }
   }
 
   // ==========================================
@@ -960,7 +976,9 @@
   // ==========================================
   function runValidation() {
     const engine = window.TransacValidationEngine;
+    const startTime = performance.now();
     const result = engine.validateDataset(state.rawRows, state.mappings, state.config);
+    const duration = Math.round(performance.now() - startTime);
 
     // Store in state
     state.validationResults.errors = result.errors;
@@ -990,19 +1008,8 @@
     updateValidationSuccessBanner(result.summary);
     updateValidationTimestamp();
 
-    // Update Recent Jobs log
-    const now = new Date();
-    const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const successPct = result.summary.totalRows > 0 ? (result.summary.validRows / result.summary.totalRows) * 100 : 0;
-    const newJob = {
-      fileName: state.file ? state.file.name : 'sample_transactions.csv',
-      timestamp: timeString,
-      rowsProcessed: result.summary.totalRows,
-      validationStatus: result.summary.invalidRows > 0 ? 'COMPLETED WITH ISSUES' : 'COMPLETED',
-      successRate: `${successPct.toFixed(1)}%`
-    };
-    state.recentJobs.unshift(newJob);
-    renderRecentJobs();
+    // Save validation run details to backend database
+    saveRunToBackend(result, duration);
 
     // Handle no-valid-rows state: disable cleaned CSV button and show warning
     if (state.cleanedRows.length === 0) {
@@ -1438,32 +1445,347 @@
   // INITIALIZE APP
   // ==========================================
   document.addEventListener('DOMContentLoaded', () => {
-    state.recentJobs = [
-      {
-        fileName: 'mock_billing_may.csv',
-        timestamp: '11:15 AM',
-        rowsProcessed: 12450,
-        validationStatus: 'COMPLETED',
-        successRate: '100.0%'
-      },
-      {
-        fileName: 'legacy_users_v2.csv',
-        timestamp: '09:30 AM',
-        rowsProcessed: 8500,
-        validationStatus: 'COMPLETED WITH ISSUES',
-        successRate: '91.2%'
-      },
-      {
-        fileName: 'sales_export_temp.csv',
-        timestamp: 'Yesterday',
-        rowsProcessed: 4200,
-        validationStatus: 'COMPLETED WITH ISSUES',
-        successRate: '78.4%'
-      }
-    ];
-    renderRecentJobs();
     initEvents();
     updateConfigFromUI();
+    loadHistory(); // Load from local SQLite backend
   });
+
+  // ==========================================
+  // BACKEND HISTORY API INTEGRATIONS
+  // ==========================================
+
+  function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.innerHTML = `
+      <svg class="toast-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      <span>${message}</span>
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.classList.add('show');
+    }, 50);
+    
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        toast.remove();
+      }, 300);
+    }, 3000);
+  }
+
+  function saveRunToBackend(result, duration) {
+    const filename = state.file ? state.file.name : 'sample_transactions.csv';
+    const fileSizeBytes = state.file ? state.file.size : 1018;
+    const countryRule = state.config.countryPhoneRule || 'GLOBAL';
+    
+    const issues = [
+      ...result.errors,
+      ...result.warnings
+    ];
+
+    const payload = {
+      filename,
+      fileSizeBytes,
+      summary: result.summary,
+      processingTimeMs: duration,
+      countryRule,
+      issues
+    };
+
+    fetch(`${API_BASE}/runs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to save to SQLite backend');
+        return response.json();
+      })
+      .then(data => {
+        if (data.success) {
+          showToast('Saved to history');
+          loadHistory();
+        }
+      })
+      .catch(err => {
+        console.error('Error saving validation run:', err);
+      });
+  }
+
+  function loadHistory() {
+    const skeleton = document.getElementById('history-loading-skeleton');
+    const tableBody = document.getElementById('history-table-body');
+    const emptyMsg = document.getElementById('history-empty-msg');
+    
+    if (skeleton) skeleton.classList.remove('hidden');
+    if (tableBody) tableBody.innerHTML = '';
+    if (emptyMsg) emptyMsg.classList.add('hidden');
+
+    // 1. Fetch Aggregated statistics
+    fetch(`${API_BASE}/stats`)
+      .then(res => res.json())
+      .then(stats => {
+        const filesEl = document.getElementById('history-stat-files');
+        const rowsEl = document.getElementById('history-stat-rows');
+        const scoreEl = document.getElementById('history-stat-score');
+        
+        if (filesEl) filesEl.textContent = stats.total_files_processed.toLocaleString();
+        if (rowsEl) rowsEl.textContent = stats.total_rows_validated.toLocaleString();
+        if (scoreEl) scoreEl.textContent = `${Number(stats.average_quality_score || 0).toFixed(1)}%`;
+      })
+      .catch(err => console.error('Error loading history statistics:', err));
+
+    // 2. Fetch recent validation runs list
+    fetch(`${API_BASE}/runs`)
+      .then(res => res.json())
+      .then(runs => {
+        if (skeleton) skeleton.classList.add('hidden');
+        
+        if (!runs || runs.length === 0) {
+          if (emptyMsg) emptyMsg.classList.remove('hidden');
+          return;
+        }
+
+        if (tableBody) {
+          runs.forEach(run => {
+            const tr = document.createElement('tr');
+            
+            // Filename
+            const tdFilename = document.createElement('td');
+            tdFilename.textContent = run.filename;
+            tdFilename.style.fontWeight = '700';
+            tdFilename.style.color = 'var(--text-heading)';
+            tr.appendChild(tdFilename);
+            
+            // Date
+            const tdDate = document.createElement('td');
+            const dateObj = new Date(run.created_at);
+            tdDate.textContent = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            tdDate.style.color = 'var(--text-muted)';
+            tr.appendChild(tdDate);
+            
+            // Total Rows
+            const tdTotal = document.createElement('td');
+            tdTotal.textContent = run.total_rows.toLocaleString();
+            tr.appendChild(tdTotal);
+            
+            // Valid Rows
+            const tdValid = document.createElement('td');
+            tdValid.textContent = run.valid_rows.toLocaleString();
+            tdValid.style.color = 'var(--success-dark)';
+            tdValid.style.fontWeight = '600';
+            tr.appendChild(tdValid);
+            
+            // Invalid Rows
+            const tdInvalid = document.createElement('td');
+            tdInvalid.textContent = run.invalid_rows.toLocaleString();
+            tdInvalid.style.color = run.invalid_rows > 0 ? 'var(--danger-dark)' : 'var(--text-body)';
+            tdInvalid.style.fontWeight = run.invalid_rows > 0 ? '600' : '400';
+            tr.appendChild(tdInvalid);
+            
+            // Quality Score
+            const tdScore = document.createElement('td');
+            const badge = document.createElement('span');
+            const scoreVal = run.data_quality_score;
+            if (scoreVal > 80) {
+              badge.className = 'badge badge-completed';
+            } else if (scoreVal >= 50) {
+              badge.className = 'badge badge-completed-errors';
+            } else {
+              badge.className = 'badge badge-error';
+            }
+            badge.textContent = `${scoreVal.toFixed(1)}%`;
+            tdScore.appendChild(badge);
+            tr.appendChild(tdScore);
+
+            // Actions
+            const tdActions = document.createElement('td');
+            tdActions.style.textAlign = 'right';
+            tdActions.style.paddingRight = '1.5rem';
+            
+            // View Details button
+            const btnView = document.createElement('button');
+            btnView.className = 'btn btn-secondary btn-small';
+            btnView.type = 'button';
+            btnView.style.marginRight = '0.5rem';
+            btnView.innerHTML = `
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+              View
+            `;
+            btnView.addEventListener('click', () => viewRunDetails(run.id));
+            
+            // Delete run button
+            const btnDelete = document.createElement('button');
+            btnDelete.className = 'btn btn-secondary btn-small';
+            btnDelete.type = 'button';
+            btnDelete.style.color = 'var(--danger)';
+            btnDelete.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+            btnDelete.innerHTML = `
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Delete
+            `;
+            btnDelete.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (confirm(`Are you sure you want to delete the run record for "${run.filename}"?`)) {
+                deleteRun(run.id);
+              }
+            });
+
+            tdActions.appendChild(btnView);
+            tdActions.appendChild(btnDelete);
+            tr.appendChild(tdActions);
+
+            tableBody.appendChild(tr);
+          });
+        }
+      })
+      .catch(err => {
+        console.error('Error listing history runs:', err);
+        if (skeleton) skeleton.classList.add('hidden');
+      });
+  }
+
+  function viewRunDetails(runId) {
+    const panel = document.getElementById('details-panel');
+    const overlay = document.getElementById('details-overlay');
+    const title = document.getElementById('panel-title');
+    const subtitle = document.getElementById('panel-subtitle');
+    const scoreVal = document.getElementById('panel-metric-score');
+    const totalVal = document.getElementById('panel-metric-total');
+    const validVal = document.getElementById('panel-metric-valid');
+    const invalidVal = document.getElementById('panel-metric-invalid');
+    const container = document.getElementById('panel-errors-container');
+
+    if (title) title.textContent = 'Loading details...';
+    if (subtitle) subtitle.textContent = '';
+    if (container) container.innerHTML = '<div style="text-align:center; padding: 2rem; color: var(--text-muted);">Fetching detailed logs...</div>';
+    
+    if (panel) panel.classList.add('open');
+    if (overlay) overlay.classList.add('open');
+
+    fetch(`${API_BASE}/runs/${runId}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Run record not found');
+        return res.json();
+      })
+      .then(run => {
+        if (title) title.textContent = run.filename;
+        if (subtitle) subtitle.textContent = `Validated on ${new Date(run.created_at).toLocaleString()}`;
+        if (scoreVal) scoreVal.textContent = `${Number(run.data_quality_score || 0).toFixed(1)}%`;
+        if (totalVal) totalVal.textContent = run.total_rows.toLocaleString();
+        if (validVal) validVal.textContent = run.valid_rows.toLocaleString();
+        if (invalidVal) invalidVal.textContent = run.invalid_rows.toLocaleString();
+
+        if (container) {
+          container.innerHTML = '';
+          const keys = Object.keys(run.errors);
+          if (keys.length === 0) {
+            container.innerHTML = `
+              <div class="empty-state-msg empty-state-success" style="margin-top: 1rem;">
+                <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                No errors or warnings found! Your data is 100% clean.
+              </div>
+            `;
+            return;
+          }
+
+          keys.sort().forEach(colName => {
+            const issues = run.errors[colName];
+            
+            const groupDiv = document.createElement('div');
+            groupDiv.style.marginBottom = '1.5rem';
+            
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'panel-group-title';
+            titleDiv.textContent = `Column: ${colName} (${issues.length} issue${issues.length !== 1 ? 's' : ''})`;
+            groupDiv.appendChild(titleDiv);
+            
+            const table = document.createElement('table');
+            table.className = 'panel-error-table';
+            
+            table.innerHTML = `
+              <thead>
+                <tr>
+                  <th style="width: 50px;">Row</th>
+                  <th style="width: 80px;">Severity</th>
+                  <th>Error Type</th>
+                  <th>Value</th>
+                  <th>Suggested Fix</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            `;
+            
+            const tbody = table.querySelector('tbody');
+            issues.forEach(issue => {
+              const tr = document.createElement('tr');
+              
+              const tdRow = document.createElement('td');
+              tdRow.textContent = issue.row;
+              tr.appendChild(tdRow);
+              
+              const tdSev = document.createElement('td');
+              const badge = document.createElement('span');
+              badge.className = `badge ${issue.severity === 'ERROR' ? 'badge-error' : 'badge-warning'}`;
+              badge.textContent = issue.severity;
+              tdSev.appendChild(badge);
+              tr.appendChild(tdSev);
+              
+              const tdType = document.createElement('td');
+              tdType.textContent = issue.type;
+              tdType.style.fontWeight = '600';
+              tr.appendChild(tdType);
+              
+              const tdVal = document.createElement('td');
+              tdVal.textContent = issue.value || 'N/A';
+              tdVal.style.color = 'var(--text-muted)';
+              tr.appendChild(tdVal);
+              
+              const tdFix = document.createElement('td');
+              tdFix.textContent = issue.suggestedFix;
+              tr.appendChild(tdFix);
+              
+              tbody.appendChild(tr);
+            });
+            
+            groupDiv.appendChild(table);
+            container.appendChild(groupDiv);
+          });
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching details:', err);
+        if (title) title.textContent = 'Error Loading Details';
+        if (container) container.innerHTML = `<div style="text-align:center; padding: 2rem; color: var(--danger);">Failed to load validation details.</div>`;
+      });
+  }
+
+  function deleteRun(runId) {
+    fetch(`${API_BASE}/runs/${runId}`, {
+      method: 'DELETE'
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showToast('Run deleted from history');
+          loadHistory();
+        }
+      })
+      .catch(err => console.error('Error deleting run:', err));
+  }
 
 })();

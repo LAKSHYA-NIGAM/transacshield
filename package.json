@@ -4,7 +4,8 @@
   "description": "Web-based transaction data validation and processing platform",
   "main": "index.html",
   "scripts": {
-    "dev": "npx -y http-server -p 8085 -c-1"
+    "start": "node server.js",
+    "dev": "node server.js & npx http-server -p 8085 -c-1"
   },
   "keywords": [
     "csv",
@@ -13,5 +14,13 @@
     "parser"
   ],
   "author": "Antigravity",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "compression": "^1.8.1",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "uuid": "^14.0.0"
+  }
 }
