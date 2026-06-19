@@ -184,6 +184,17 @@ app.get('/api/runs/:id', (req, res) => {
   }
 });
 
+// 4a. DELETE /api/runs — Clears entire validation history
+app.delete('/api/runs', (req, res) => {
+  try {
+    db.prepare('DELETE FROM validation_runs').run();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Database delete all error:', err);
+    res.status(500).json({ error: 'Failed to clear validation history.' });
+  }
+});
+
 // 4. DELETE /api/runs/:id — Deletes validation run (errors cascade delete)
 app.delete('/api/runs/:id', (req, res) => {
   const { id } = req.params;

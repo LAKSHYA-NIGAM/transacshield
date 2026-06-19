@@ -44,7 +44,10 @@
     cleanedRows: [],     // Valid normalized rows (0 errors)
     filteredErrors: [],  // Errors list after search / filters
     activeTab: 'preview', // 'preview' or 'errors'
-    recentJobs: [] // Stores job logs
+    recentJobs: [], // Stores job logs
+    historyRuns: [], // Active SQLite history runs list
+    historySortField: 'created_at', // default sort field
+    historySortAscending: false // default sorting order (descending date)
   };
 
   // ==========================================
@@ -217,6 +220,7 @@
               updateGuessBadges();
               checkRequiredMappings();
               renderRawPreviewTable();
+              populateSmartChips();
               
               elements.fileInfo.classList.remove('hidden');
               elements.dropZone.classList.add('hidden');
@@ -405,6 +409,91 @@
       closeBtn.addEventListener('click', closePanel);
       overlay.addEventListener('click', closePanel);
     }
+
+    // Full-page drag and drop overlay handlers
+    let dragCounter = 0;
+    const dragOverlay = document.getElementById('full-page-drag-overlay');
+    
+    document.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      if (dragCounter === 1 && dragOverlay) {
+        dragOverlay.classList.add('active');
+      }
+    });
+    
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+    
+    document.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter === 0 && dragOverlay) {
+        dragOverlay.classList.remove('active');
+      }
+    });
+    
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      if (dragOverlay) {
+        dragOverlay.classList.remove('active');
+      }
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        handleFile(files[0]);
+      }
+    });
+
+    // Keyboard shortcut triggers
+    document.addEventListener('keydown', (e) => {
+      const tag = e.target.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'select' || tag === 'textarea' || e.target.isContentEditable) {
+        return;
+      }
+      const key = e.key.toUpperCase();
+      if (key === 'V') {
+        if (state.rawRows.length > 0 && !elements.btnValidateGenerate.disabled && !elements.workspaceReviewContainer.classList.contains('hidden')) {
+          e.preventDefault();
+          handleValidationTrigger(false);
+        }
+      } else if (key === 'R') {
+        if (state.file) {
+          e.preventDefault();
+          resetDashboard();
+        }
+      } else if (key === 'H') {
+        const historySection = document.querySelector('.recent-jobs-section');
+        if (historySection) {
+          e.preventDefault();
+          historySection.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    });
+
+    // Row Inspector drawer close events
+    const rowInspectorCloseBtn = document.getElementById('row-inspector-close-btn');
+    const rowInspectorOverlay = document.getElementById('row-inspector-overlay');
+    const rowInspectorPanel = document.getElementById('row-inspector-panel');
+    
+    if (rowInspectorCloseBtn && rowInspectorOverlay && rowInspectorPanel) {
+      const closeRowInspector = () => {
+        rowInspectorPanel.classList.remove('open');
+        rowInspectorOverlay.classList.remove('open');
+      };
+      rowInspectorCloseBtn.addEventListener('click', closeRowInspector);
+      rowInspectorOverlay.addEventListener('click', closeRowInspector);
+    }
+
+    // Bulk actions and Phase 2 download click handlers
+    document.getElementById('btn-clear-history')?.addEventListener('click', () => {
+      if (confirm('Are you sure you want to clear all validation run history from the database?')) {
+        clearAllHistory();
+      }
+    });
+    
+    document.getElementById('btn-download-json')?.addEventListener('click', downloadErrorSummaryJSON);
   }
 
   // ==========================================
@@ -522,6 +611,7 @@
 
           // Render raw preview table
           renderRawPreviewTable();
+          populateSmartChips();
 
           elements.fileInfo.classList.remove('hidden');
           elements.dropZone.classList.add('hidden');
@@ -838,6 +928,23 @@
     if (elements.successBanner) elements.successBanner.classList.add('hidden');
     if (elements.timestampContainer) elements.timestampContainer.classList.add('hidden');
 
+    // Phase 2 Hide Insights & Banners
+    document.getElementById('dashboard-insights-row')?.classList.add('hidden');
+    document.getElementById('smart-insight-banner')?.classList.add('hidden');
+    
+    const smartChips = document.getElementById('smart-chips-container');
+    if (smartChips) {
+      smartChips.innerHTML = '';
+      smartChips.classList.add('hidden');
+    }
+    
+    document.getElementById('export-card-cleaned')?.classList.remove('disabled');
+    document.getElementById('export-card-report')?.classList.remove('disabled');
+    document.getElementById('export-card-json')?.classList.remove('disabled');
+    
+    const btnJson = document.getElementById('btn-download-json');
+    if (btnJson) btnJson.disabled = true;
+
     // Reset KPI Row to 0 values
     animateCount(elements.statTotal, 0);
     animateCount(elements.statValid, 0);
@@ -1010,9 +1117,27 @@
     updateValidationSuccessBanner(result.summary);
     updateValidationTimestamp();
 
+    // ───────────────────────────────────────────
+    // Phase 2 Insights & Animations
+    // ───────────────────────────────────────────
+    document.getElementById('dashboard-insights-row')?.classList.remove('hidden');
+    const successPct = result.summary.totalRows > 0 ? (result.summary.validRows / result.summary.totalRows) * 100 : 0;
+    animateQualityRing(successPct);
+    renderErrorChart();
+    updateSmartInsights(result);
+
+    // Update export card stats text contents
+    const cleanedStat = document.getElementById('export-stat-cleaned');
+    const reportStat = document.getElementById('export-stat-report');
+    const jsonStat = document.getElementById('export-stat-json');
+    if (cleanedStat) cleanedStat.textContent = `${result.summary.validRows.toLocaleString()} rows`;
+    if (reportStat) reportStat.textContent = `${result.summary.totalRows.toLocaleString()} rows`;
+    if (jsonStat) jsonStat.textContent = `${(result.summary.errorCount + result.summary.warningCount).toLocaleString()} issues`;
+
     // Save validation run details to backend database
     saveRunToBackend(result, duration);
 
+    // Handle no-valid-rows state: disable cleaned CSV button and show warning
     // Handle no-valid-rows state: disable cleaned CSV button and show warning
     if (state.cleanedRows.length === 0) {
       if (elements.btnDownloadCleaned) elements.btnDownloadCleaned.disabled = true;
@@ -1021,6 +1146,340 @@
       if (elements.btnDownloadCleaned) elements.btnDownloadCleaned.disabled = false;
       if (elements.noValidRowsMsg) elements.noValidRowsMsg.classList.add('hidden');
     }
+  }
+
+  // ==========================================
+  // PHASE 2 HELPER FUNCTIONS
+  // ==========================================
+
+  function populateSmartChips() {
+    const container = document.getElementById('smart-chips-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    const headers = state.rawHeaders;
+    if (!headers || headers.length === 0) {
+      container.classList.add('hidden');
+      return;
+    }
+    
+    container.classList.remove('hidden');
+    
+    headers.forEach((header, idx) => {
+      const type = state.columnTypes[header] || 'Text';
+      const chip = document.createElement('div');
+      chip.className = 'smart-chip';
+      chip.style.animationDelay = `${idx * 0.05}s`;
+      
+      chip.innerHTML = `
+        <span class="chip-col-name">${header}</span>
+        <span class="chip-type-tag">${type}</span>
+      `;
+      container.appendChild(chip);
+    });
+  }
+
+  function startValidationProcessing(isValidateOnly) {
+    const modal = document.getElementById('processing-modal-overlay');
+    const title = document.getElementById('processing-stage-title');
+    const desc = document.getElementById('processing-stage-desc');
+    const barFill = document.getElementById('processing-progress-bar-fill');
+    const percentage = document.getElementById('processing-progress-percentage');
+    
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    
+    const stages = [
+      { title: "Initializing Engine...", desc: "Preparing datasets and mapping validation constraints.", pct: 0 },
+      { title: "Mapping Schema Headers...", desc: "Aligning expected fields with CSV column labels.", pct: 20 },
+      { title: "Parsing Transaction Signatures...", desc: "Evaluating telephone formats, amounts, and email syntaxes.", pct: 40 },
+      { title: "Validating Country Rules...", desc: "Applying regional phone checks and date-time conversions.", pct: 60 },
+      { title: "Running Deduplication Checks...", desc: "Scanning for repeated transaction signatures.", pct: 80 },
+      { title: "Compiling Quality Scoring...", desc: "Finalizing data quality ratings and error breakdowns.", pct: 100 }
+    ];
+    
+    let currentStage = 0;
+    
+    const updateStage = () => {
+      if (currentStage < stages.length) {
+        const stage = stages[currentStage];
+        title.textContent = stage.title;
+        desc.textContent = stage.desc;
+        barFill.style.width = `${stage.pct}%`;
+        percentage.textContent = `${stage.pct}%`;
+        currentStage++;
+        setTimeout(updateStage, 400);
+      } else {
+        modal.classList.add('hidden');
+        executeValidation(isValidateOnly);
+      }
+    };
+    
+    updateStage();
+  }
+
+  function executeValidation(isValidateOnly) {
+    runValidation();
+
+    const cardCleaned = document.getElementById('export-card-cleaned');
+    const cardReport = document.getElementById('export-card-report');
+    const cardJson = document.getElementById('export-card-json');
+    const btnJson = document.getElementById('btn-download-json');
+
+    if (isValidateOnly) {
+      elements.downloadLockedBanner.classList.remove('hidden');
+      
+      elements.btnDownloadCleaned.disabled = true;
+      elements.btnDownloadReport.disabled = true;
+      if (btnJson) btnJson.disabled = true;
+      
+      cardCleaned?.classList.add('disabled');
+      cardReport?.classList.add('disabled');
+      cardJson?.classList.add('disabled');
+      
+      elements.chunkStatusMsg.textContent = 'Exports are locked. Run "Validate & Generate Output" to enable file downloads.';
+      elements.chunkStatusMsg.classList.remove('hidden');
+      elements.chunkButtonsContainer.innerHTML = '';
+    } else {
+      elements.downloadLockedBanner.classList.add('hidden');
+      
+      elements.btnDownloadCleaned.disabled = false;
+      elements.btnDownloadReport.disabled = false;
+      if (btnJson) btnJson.disabled = false;
+      
+      cardCleaned?.classList.remove('disabled');
+      cardReport?.classList.remove('disabled');
+      cardJson?.classList.remove('disabled');
+      
+      generateChunks();
+    }
+
+    elements.dashboardSection.classList.remove('hidden');
+  }
+
+  function animateQualityRing(targetScore) {
+    const circle = document.getElementById('ring-circle');
+    const percentageEl = document.getElementById('ring-percentage');
+    if (!circle || !percentageEl) return;
+    
+    circle.setAttribute('stroke', targetScore > 80 ? '#10b981' : (targetScore >= 50 ? '#f59e0b' : '#ef4444'));
+    
+    const duration = 1500;
+    const startTime = performance.now();
+    const startOffset = 440;
+    const endOffset = 440 - (440 * (targetScore / 100));
+    
+    function updateRing(currentTime) {
+      const elapsed = currentTime - startTime;
+      if (elapsed >= duration) {
+        circle.style.strokeDashoffset = endOffset;
+        percentageEl.textContent = `${targetScore.toFixed(1)}%`;
+      } else {
+        const progress = elapsed / duration;
+        const easeProgress = progress * (2 - progress);
+        const currentOffset = startOffset - ((startOffset - endOffset) * easeProgress);
+        const currentPercentage = (targetScore * easeProgress);
+        circle.style.strokeDashoffset = currentOffset;
+        percentageEl.textContent = `${currentPercentage.toFixed(1)}%`;
+        requestAnimationFrame(updateRing);
+      }
+    }
+    requestAnimationFrame(updateRing);
+  }
+
+  function renderErrorChart() {
+    const container = document.getElementById('error-chart-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    const issues = [...state.validationResults.errors, ...state.validationResults.warnings];
+    const categories = [
+      { label: "Phone Errors", key: "phone", count: issues.filter(i => i.errorCode === 'INVALID_PHONE').length, barClass: "phone-bar" },
+      { label: "Date Errors", key: "date", count: issues.filter(i => i.errorCode === 'INVALID_DATE').length, barClass: "date-bar" },
+      { label: "Email Errors", key: "email", count: issues.filter(i => i.errorCode === 'INVALID_EMAIL').length, barClass: "email-bar" },
+      { label: "Payment Mode Errors", key: "payment", count: issues.filter(i => i.errorCode === 'INVALID_PAYMENT').length, barClass: "payment-bar" },
+      { label: "Missing Fields", key: "missing", count: issues.filter(i => i.errorCode === 'MISSING_ORDER_ID' || i.value === '').length, barClass: "missing-bar" },
+      { label: "Duplicates", key: "duplicate", count: issues.filter(i => i.errorCode === 'DUPLICATE_ORDER' || i.errorCode === 'DUPLICATE_PAIR').length, barClass: "duplicate-bar" }
+    ];
+    
+    const activeCategories = categories.filter(c => c.count > 0);
+    
+    if (activeCategories.length === 0) {
+      container.innerHTML = `
+        <div style="font-size: 0.8125rem; font-weight: 600; color: var(--success-dark); display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          Your dataset contains no errors or warnings!
+        </div>
+      `;
+      return;
+    }
+    
+    const maxCount = Math.max(...categories.map(c => c.count));
+    
+    activeCategories.forEach(cat => {
+      const pct = maxCount > 0 ? (cat.count / maxCount) * 100 : 0;
+      const row = document.createElement('div');
+      row.className = 'chart-row';
+      row.innerHTML = `
+        <span class="chart-label">${cat.label}</span>
+        <div class="chart-bar-wrapper">
+          <div class="chart-bar ${cat.barClass}" style="width: 0%;"></div>
+        </div>
+        <span class="chart-count">${cat.count}</span>
+      `;
+      container.appendChild(row);
+      
+      setTimeout(() => {
+        const bar = row.querySelector('.chart-bar');
+        if (bar) bar.style.width = `${pct}%`;
+      }, 50);
+    });
+  }
+
+  function updateSmartInsights(result) {
+    const banner = document.getElementById('smart-insight-banner');
+    const textEl = document.getElementById('smart-insight-text');
+    if (!banner || !textEl) return;
+    
+    const summary = result.summary;
+    const totalIssues = summary.errorCount + summary.warningCount;
+    
+    if (totalIssues === 0) {
+      textEl.innerHTML = "<strong>Congratulations!</strong> Your transaction dataset is 100% clean and ready for immediate downstream processing.";
+      banner.classList.remove('hidden');
+      return;
+    }
+    
+    let maxErrors = 0;
+    let worstCol = '';
+    Object.keys(summary.errorsByColumn).forEach(col => {
+      if (summary.errorsByColumn[col] > maxErrors) {
+        maxErrors = summary.errorsByColumn[col];
+        worstCol = col;
+      }
+    });
+    
+    let sentence = `<strong>Action Required:</strong> ${summary.errorCount} errors and ${summary.warningCount} warnings detected. `;
+    if (worstCol) {
+      sentence += `Most validation issues occurred in the <strong>"${worstCol}"</strong> column. `;
+    }
+    sentence += `We recommend clicking on flagged rows in the preview table below to inspect suggested normalizations.`;
+    
+    textEl.innerHTML = sentence;
+    banner.classList.remove('hidden');
+  }
+
+  function downloadErrorSummaryJSON() {
+    if (state.validationResults.normalizedRows.length === 0) return;
+    
+    const summaryData = {
+      filename: state.file ? state.file.name : 'sample_transactions.csv',
+      summary: state.validationResults.summary,
+      errors: state.validationResults.errors,
+      warnings: state.validationResults.warnings
+    };
+    
+    const jsonString = JSON.stringify(summaryData, null, 2);
+    const originalName = state.file ? state.file.name.replace(/\.[^/.]+$/, "") : 'sample_transactions';
+    triggerDownload(jsonString, `${originalName}_validation_errors.json`, 'application/json;charset=utf-8;');
+  }
+
+  function openRowInspector(item) {
+    const panel = document.getElementById('row-inspector-panel');
+    const overlay = document.getElementById('row-inspector-overlay');
+    if (!panel || !overlay) return;
+    
+    panel.classList.add('open');
+    overlay.classList.add('open');
+    
+    document.getElementById('row-inspector-subtitle').textContent = `Row #${item.rowIndex} details & normalization comparison`;
+    
+    const compareContainer = document.getElementById('row-inspector-compare-container');
+    compareContainer.innerHTML = '';
+    
+    state.rawHeaders.forEach(header => {
+      const origVal = item.originalRow[header] !== undefined ? item.originalRow[header] : '';
+      const normVal = item.normalizedRow[header] !== undefined ? item.normalizedRow[header] : '';
+      
+      const colErrors = item.errors.filter(e => e.column === header);
+      const isFixed = origVal !== normVal;
+      const hasError = colErrors.length > 0;
+      
+      let fixedClass = '';
+      if (isFixed) {
+        fixedClass = hasError ? 'fixed was-error' : 'fixed';
+      }
+      
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'compare-row';
+      rowDiv.innerHTML = `
+        <div class="compare-cell">
+          <span class="compare-cell-title">${header} (Original)</span>
+          <span class="compare-cell-val">${origVal || '<span class="text-muted">empty</span>'}</span>
+        </div>
+        <div class="compare-cell">
+          <span class="compare-cell-title">${header} (Cleaned)</span>
+          <span class="compare-cell-val ${fixedClass}">${normVal || '<span class="text-muted">empty</span>'}</span>
+        </div>
+      `;
+      compareContainer.appendChild(rowDiv);
+    });
+    
+    const issuesContainer = document.getElementById('row-inspector-issues-container');
+    issuesContainer.innerHTML = '';
+    
+    const allIssues = [...item.errors, ...item.warnings];
+    if (allIssues.length === 0) {
+      issuesContainer.innerHTML = `
+        <div class="empty-state-msg empty-state-success" style="margin-top: 0.5rem; padding: 1rem;">
+          <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          No issues on this row!
+        </div>
+      `;
+    } else {
+      allIssues.forEach(issue => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = `inspector-issue-item severity-${issue.severity.toLowerCase()}`;
+        itemDiv.innerHTML = `
+          <div class="issue-item-header">
+            <span class="issue-item-col">${issue.column}</span>
+            <span class="badge ${issue.severity === 'ERROR' ? 'badge-error' : 'badge-warning'}">${issue.severity}</span>
+          </div>
+          <div class="issue-item-msg">${issue.type}</div>
+          <div class="issue-item-fix">Suggested Fix: ${issue.suggestedFix}</div>
+        `;
+        issuesContainer.appendChild(itemDiv);
+      });
+    }
+    
+    const copyBtn = document.getElementById('btn-row-inspector-copy');
+    const newCopyBtn = copyBtn.cloneNode(true);
+    copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
+    
+    newCopyBtn.addEventListener('click', () => {
+      const rowStr = JSON.stringify(item.normalizedRow, null, 2);
+      navigator.clipboard.writeText(rowStr)
+        .then(() => showToast('Row copied to clipboard!'))
+        .catch(err => console.error('Error copying row:', err));
+    });
+  }
+
+  function clearAllHistory() {
+    fetch(API_BASE + '/api/runs', {
+      method: 'DELETE'
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showToast('Validation history cleared!');
+          loadHistory();
+        }
+      })
+      .catch(err => console.error('Error clearing history:', err));
   }
 
   /**
@@ -1136,6 +1595,10 @@
         }
 
         tr.appendChild(td);
+      });
+
+      tr.addEventListener('click', () => {
+        openRowInspector(item);
       });
 
       elements.previewTableBody.appendChild(tr);
@@ -1449,6 +1912,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     initEvents();
     updateConfigFromUI();
+    setupHistorySorting();
     loadHistory(); // Load from local SQLite backend
   });
 
@@ -1456,17 +1920,45 @@
   // BACKEND HISTORY API INTEGRATIONS
   // ==========================================
 
-  function showToast(message) {
+  function showToast(message, type = 'success') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+    
     const toast = document.createElement('div');
-    toast.className = 'toast-notification';
+    toast.className = `toast-notification ${type}`;
+    
+    let iconSvg = '';
+    if (type === 'success') {
+      iconSvg = `
+        <svg class="toast-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      `;
+    } else if (type === 'error') {
+      iconSvg = `
+        <svg class="toast-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      `;
+    } else {
+      iconSvg = `
+        <svg class="toast-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+      `;
+    }
+    
     toast.innerHTML = `
-      <svg class="toast-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-        <polyline points="22 4 12 14.01 9 11.01"/>
-      </svg>
+      ${iconSvg}
       <span>${message}</span>
     `;
-    document.body.appendChild(toast);
+    container.appendChild(toast);
     
     setTimeout(() => {
       toast.classList.add('show');
@@ -1476,6 +1968,9 @@
       toast.classList.remove('show');
       setTimeout(() => {
         toast.remove();
+        if (container.childNodes.length === 0) {
+          container.remove();
+        }
       }, 300);
     }, 3000);
   }
@@ -1548,115 +2043,186 @@
     fetch(API_BASE + '/api/runs')
       .then(res => res.json())
       .then(runs => {
-        if (skeleton) skeleton.classList.add('hidden');
-        
-        if (!runs || runs.length === 0) {
-          if (emptyMsg) emptyMsg.classList.remove('hidden');
-          return;
-        }
-
-        if (tableBody) {
-          runs.forEach(run => {
-            const tr = document.createElement('tr');
-            
-            // Filename
-            const tdFilename = document.createElement('td');
-            tdFilename.textContent = run.filename;
-            tdFilename.style.fontWeight = '700';
-            tdFilename.style.color = 'var(--text-heading)';
-            tr.appendChild(tdFilename);
-            
-            // Date
-            const tdDate = document.createElement('td');
-            const dateObj = new Date(run.created_at);
-            tdDate.textContent = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            tdDate.style.color = 'var(--text-muted)';
-            tr.appendChild(tdDate);
-            
-            // Total Rows
-            const tdTotal = document.createElement('td');
-            tdTotal.textContent = run.total_rows.toLocaleString();
-            tr.appendChild(tdTotal);
-            
-            // Valid Rows
-            const tdValid = document.createElement('td');
-            tdValid.textContent = run.valid_rows.toLocaleString();
-            tdValid.style.color = 'var(--success-dark)';
-            tdValid.style.fontWeight = '600';
-            tr.appendChild(tdValid);
-            
-            // Invalid Rows
-            const tdInvalid = document.createElement('td');
-            tdInvalid.textContent = run.invalid_rows.toLocaleString();
-            tdInvalid.style.color = run.invalid_rows > 0 ? 'var(--danger-dark)' : 'var(--text-body)';
-            tdInvalid.style.fontWeight = run.invalid_rows > 0 ? '600' : '400';
-            tr.appendChild(tdInvalid);
-            
-            // Quality Score
-            const tdScore = document.createElement('td');
-            const badge = document.createElement('span');
-            const scoreVal = run.data_quality_score;
-            if (scoreVal > 80) {
-              badge.className = 'badge badge-completed';
-            } else if (scoreVal >= 50) {
-              badge.className = 'badge badge-completed-errors';
-            } else {
-              badge.className = 'badge badge-error';
-            }
-            badge.textContent = `${scoreVal.toFixed(1)}%`;
-            tdScore.appendChild(badge);
-            tr.appendChild(tdScore);
-
-            // Actions
-            const tdActions = document.createElement('td');
-            tdActions.style.textAlign = 'right';
-            tdActions.style.paddingRight = '1.5rem';
-            
-            // View Details button
-            const btnView = document.createElement('button');
-            btnView.className = 'btn btn-secondary btn-small';
-            btnView.type = 'button';
-            btnView.style.marginRight = '0.5rem';
-            btnView.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
-                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-              View
-            `;
-            btnView.addEventListener('click', () => viewRunDetails(run.id));
-            
-            // Delete run button
-            const btnDelete = document.createElement('button');
-            btnDelete.className = 'btn btn-secondary btn-small';
-            btnDelete.type = 'button';
-            btnDelete.style.color = 'var(--danger)';
-            btnDelete.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-            btnDelete.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-              Delete
-            `;
-            btnDelete.addEventListener('click', (e) => {
-              e.stopPropagation();
-              if (confirm(`Are you sure you want to delete the run record for "${run.filename}"?`)) {
-                deleteRun(run.id);
-              }
-            });
-
-            tdActions.appendChild(btnView);
-            tdActions.appendChild(btnDelete);
-            tr.appendChild(tdActions);
-
-            tableBody.appendChild(tr);
-          });
-        }
+        state.historyRuns = runs || [];
+        renderHistoryTable();
       })
       .catch(err => {
         console.error('Error listing history runs:', err);
         if (skeleton) skeleton.classList.add('hidden');
       });
+  }
+
+  function renderHistoryTable() {
+    const skeleton = document.getElementById('history-loading-skeleton');
+    const tableBody = document.getElementById('history-table-body');
+    const emptyMsg = document.getElementById('history-empty-msg');
+    
+    if (skeleton) skeleton.classList.add('hidden');
+    if (tableBody) tableBody.innerHTML = '';
+    
+    const runs = [...state.historyRuns];
+    
+    if (!runs || runs.length === 0) {
+      if (emptyMsg) emptyMsg.classList.remove('hidden');
+      return;
+    }
+    if (emptyMsg) emptyMsg.classList.add('hidden');
+    
+    // Perform memory sort based on active field and direction
+    const field = state.historySortField;
+    const asc = state.historySortAscending;
+    runs.sort((a, b) => {
+      let valA = a[field];
+      let valB = b[field];
+      
+      if (field === 'created_at') {
+        valA = new Date(valA).getTime();
+        valB = new Date(valB).getTime();
+      }
+      
+      if (typeof valA === 'string') {
+        return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      } else {
+        return asc ? valA - valB : valB - valA;
+      }
+    });
+    
+    if (tableBody) {
+      runs.forEach(run => {
+        const tr = document.createElement('tr');
+        
+        // Filename
+        const tdFilename = document.createElement('td');
+        tdFilename.textContent = run.filename;
+        tdFilename.style.fontWeight = '700';
+        tdFilename.style.color = 'var(--text-heading)';
+        tr.appendChild(tdFilename);
+        
+        // Date
+        const tdDate = document.createElement('td');
+        const dateObj = new Date(run.created_at);
+        tdDate.textContent = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        tdDate.style.color = 'var(--text-muted)';
+        tr.appendChild(tdDate);
+        
+        // Total Rows
+        const tdTotal = document.createElement('td');
+        tdTotal.textContent = run.total_rows.toLocaleString();
+        tr.appendChild(tdTotal);
+        
+        // Valid Rows
+        const tdValid = document.createElement('td');
+        tdValid.textContent = run.valid_rows.toLocaleString();
+        tdValid.style.color = 'var(--success-dark)';
+        tdValid.style.fontWeight = '600';
+        tr.appendChild(tdValid);
+        
+        // Invalid Rows
+        const tdInvalid = document.createElement('td');
+        tdInvalid.textContent = run.invalid_rows.toLocaleString();
+        tdInvalid.style.color = run.invalid_rows > 0 ? 'var(--danger-dark)' : 'var(--text-body)';
+        tdInvalid.style.fontWeight = run.invalid_rows > 0 ? '600' : '400';
+        tr.appendChild(tdInvalid);
+        
+        // Quality Score
+        const tdScore = document.createElement('td');
+        const badge = document.createElement('span');
+        const scoreVal = run.data_quality_score;
+        if (scoreVal > 80) {
+          badge.className = 'badge badge-completed';
+        } else if (scoreVal >= 50) {
+          badge.className = 'badge badge-completed-errors';
+        } else {
+          badge.className = 'badge badge-error';
+        }
+        badge.textContent = `${scoreVal.toFixed(1)}%`;
+        tdScore.appendChild(badge);
+        tr.appendChild(tdScore);
+
+        // Actions
+        const tdActions = document.createElement('td');
+        tdActions.style.textAlign = 'right';
+        tdActions.style.paddingRight = '1.5rem';
+        
+        // View Details button
+        const btnView = document.createElement('button');
+        btnView.className = 'btn btn-secondary btn-small';
+        btnView.type = 'button';
+        btnView.style.marginRight = '0.5rem';
+        btnView.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
+            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+          View
+        `;
+        btnView.addEventListener('click', () => viewRunDetails(run.id));
+        
+        // Delete run button
+        const btnDelete = document.createElement('button');
+        btnDelete.className = 'btn btn-secondary btn-small';
+        btnDelete.type = 'button';
+        btnDelete.style.color = 'var(--danger)';
+        btnDelete.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+        btnDelete.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          Delete
+        `;
+        btnDelete.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (confirm(`Are you sure you want to delete the run record for "${run.filename}"?`)) {
+            deleteRun(run.id);
+          }
+        });
+
+        tdActions.appendChild(btnView);
+        tdActions.appendChild(btnDelete);
+        tr.appendChild(tdActions);
+
+        tableBody.appendChild(tr);
+      });
+    }
+  }
+
+  function setupHistorySorting() {
+    const historyHeaders = document.querySelectorAll('.history-table th');
+    const sortFields = ['filename', 'created_at', 'total_rows', 'valid_rows', 'invalid_rows', 'data_quality_score'];
+    const originalHeaderTexts = ['Filename', 'Validated At', 'Total Rows', 'Valid Rows', 'Invalid Rows', 'Quality Score'];
+    
+    historyHeaders.forEach((th, idx) => {
+      if (idx < 6) {
+        th.style.cursor = 'pointer';
+        th.style.userSelect = 'none';
+        th.addEventListener('click', () => {
+          const clickedField = sortFields[idx];
+          if (state.historySortField === clickedField) {
+            state.historySortAscending = !state.historySortAscending;
+          } else {
+            state.historySortField = clickedField;
+            state.historySortAscending = true;
+          }
+          
+          // Update visual sort indicators inline
+          historyHeaders.forEach((h, i) => {
+            if (i < 6) {
+              const field = sortFields[i];
+              const baseText = originalHeaderTexts[i];
+              if (state.historySortField === field) {
+                h.innerHTML = `${baseText} ${state.historySortAscending ? '▲' : '▼'}`;
+                h.style.color = 'var(--primary)';
+              } else {
+                h.innerHTML = baseText;
+                h.style.color = '';
+              }
+            }
+          });
+          
+          renderHistoryTable();
+        });
+      }
+    });
   }
 
   function viewRunDetails(runId) {

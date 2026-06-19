@@ -14,6 +14,20 @@
 </head>
 <body>
 
+  <!-- Full Page Drag and Drop Overlay (Feature 5) -->
+  <div id="full-page-drag-overlay" class="full-page-drag-overlay">
+    <div class="drag-overlay-content">
+      <svg class="upload-large-icon animate-bounce" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <path d="M12 18v-6"/>
+        <path d="m9 15 3-3 3 3"/>
+      </svg>
+      <h2>Drop File to Upload</h2>
+      <p>Release to parse your CSV transaction dataset instantly</p>
+    </div>
+  </div>
+
   <!-- Thin Validation Health Bar (Fixed at top of screen) -->
   <div id="validation-health-bar" class="validation-health-bar hidden">
     <div id="validation-health-bar-fill" class="validation-health-bar-fill"></div>
@@ -44,7 +58,9 @@
         </div>
         <div class="header-actions">
           <button id="hdr-btn-load-demo" class="btn btn-secondary btn-small" type="button">Load Demo Data</button>
-          <button id="hdr-btn-validate" class="btn btn-primary btn-small hidden" type="button">Validate Dataset</button>
+          <button id="hdr-btn-validate" class="btn btn-primary btn-small hidden" type="button">
+            Validate Dataset <kbd class="kbd-badge">V</kbd>
+          </button>
         </div>
       </div>
     </div>
@@ -158,6 +174,16 @@
       </div>
     </section>
 
+    <!-- Smart Insight Banner (Polish 8) -->
+    <div id="smart-insight-banner" class="container hidden">
+      <div class="insight-banner-content">
+        <svg class="insight-banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        <span id="smart-insight-text">Loading insights...</span>
+      </div>
+    </div>
+
     <!-- Upload & Config section -->
     <div class="grid-twocol container">
       
@@ -229,9 +255,11 @@
               </div>
             </div>
             <div class="file-chip-right">
-              <button id="btn-reset" class="remove-file-link" type="button">Remove file</button>
+              <button id="btn-reset" class="remove-file-link" type="button">Remove file <kbd class="kbd-badge">R</kbd></button>
             </div>
           </div>
+          <!-- Smart Column Detection Chips Container (Feature 3) -->
+          <div id="smart-chips-container" class="smart-chips-container"></div>
         </div>
 
         <!-- Processing Progress -->
@@ -501,6 +529,34 @@
         </div>
       </section>
 
+      <!-- Dashboard Insights: Data Quality Score Ring & Error Distribution Chart (Features 1 & 2) -->
+      <div id="dashboard-insights-row" class="dashboard-insights-row grid-twocol hidden">
+        <!-- SVG Quality Progress Ring -->
+        <div class="card insight-card ring-card">
+          <h3 class="insight-title">Data Quality Score</h3>
+          <div class="ring-flex-container">
+            <div class="ring-wrapper">
+              <svg class="progress-ring" width="160" height="160">
+                <circle class="progress-ring__background" stroke="#e2e8f0" stroke-width="12" fill="transparent" r="70" cx="80" cy="80"/>
+                <circle id="ring-circle" class="progress-ring__circle" stroke="#10b981" stroke-width="12" fill="transparent" r="70" cx="80" cy="80" stroke-dasharray="440" stroke-dashoffset="440"/>
+              </svg>
+              <div class="ring-text-container">
+                <span id="ring-percentage" class="ring-percentage">0%</span>
+              </div>
+            </div>
+            <div class="ring-subtext">Data Quality Score</div>
+          </div>
+        </div>
+
+        <!-- Error Distribution Bar Chart -->
+        <div class="card insight-card chart-card">
+          <h3 class="insight-title">Error Distribution by Category</h3>
+          <div id="error-chart-container" class="error-chart-container">
+            <!-- Dynamic Category Rows will be inserted here -->
+          </div>
+        </div>
+      </div>
+
       <!-- Error Insights & Tab Panes -->
       <section class="card tabs-card">
         <div class="tab-headers">
@@ -593,32 +649,60 @@
         </div>
 
         <div class="action-flex-container">
-          <div class="main-downloads">
-            <h3>Standard Downloads</h3>
-            <div class="btn-group-actions">
-              <div class="download-item">
-                <button id="btn-download-cleaned" class="btn btn-primary">
+          <!-- Export Cards Grid (Feature 4) -->
+          <div class="export-cards-grid">
+            <!-- Card 1: Cleaned CSV -->
+            <div class="export-card" id="export-card-cleaned">
+              <div class="export-card-accent border-success"></div>
+              <div class="export-card-content">
+                <span class="export-card-stat" id="export-stat-cleaned">0 rows</span>
+                <h4 class="export-card-title">Cleaned CSV</h4>
+                <p class="export-card-desc">Contains only rows that passed all validation rules, with normalized values.</p>
+                <button id="btn-download-cleaned" class="btn btn-primary btn-full-width">
                   <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                   </svg>
-                  Download Cleaned CSV
+                  Download CSV
                 </button>
-                <p class="download-hint">Contains only rows that passed all validations, with normalized values.</p>
               </div>
-              <div class="download-item">
-                <button id="btn-download-report" class="btn btn-secondary">
+            </div>
+
+            <!-- Card 2: Validation Report -->
+            <div class="export-card" id="export-card-report">
+              <div class="export-card-accent border-secondary"></div>
+              <div class="export-card-content">
+                <span class="export-card-stat" id="export-stat-report">0 rows</span>
+                <h4 class="export-card-title">Validation Report</h4>
+                <p class="export-card-desc">Contains all rows with appended validation status and error columns.</p>
+                <button id="btn-download-report" class="btn btn-secondary btn-full-width">
                   <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
                   </svg>
-                  Download Validation Report
+                  Download Report
                 </button>
-                <p class="download-hint">Contains all rows with appended Validation_Status, Validation_Errors, and Validation_Warnings columns.</p>
               </div>
             </div>
-            <div id="no-valid-rows-msg" class="no-valid-rows-msg hidden">
-              <svg class="btn-icon-small" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              No valid rows exist. All records failed validation — cleaned CSV download is disabled.
+
+            <!-- Card 3: Error Summary JSON -->
+            <div class="export-card" id="export-card-json">
+              <div class="export-card-accent border-danger"></div>
+              <div class="export-card-content">
+                <span class="export-card-stat" id="export-stat-json">0 issues</span>
+                <h4 class="export-card-title">Error Summary JSON</h4>
+                <p class="export-card-desc">A structured JSON summary listing all detected validation errors grouped by column.</p>
+                <button id="btn-download-json" class="btn btn-secondary btn-full-width">
+                  <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Download JSON
+                </button>
+              </div>
             </div>
+          </div>
+
+          <div id="no-valid-rows-msg" class="no-valid-rows-msg hidden" style="width: 100%;">
+            <svg class="btn-icon-small" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            No valid rows exist. All records failed validation — cleaned CSV download is disabled.
           </div>
           
           <div class="chunking-downloads">
@@ -635,11 +719,16 @@
     <!-- SECTION 10: Validation History (Recent Runs) -->
     <section class="recent-jobs-section container">
       <div class="card recent-jobs-card">
-        <h2 class="card-title">
-          <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/>
-          </svg>
-          Recent Runs
+        <h2 class="card-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <span style="display: flex; align-items: center; gap: 0.625rem;">
+            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/>
+            </svg>
+            Recent Runs <kbd class="kbd-badge">H</kbd>
+          </span>
+          <button id="btn-clear-history" class="btn btn-secondary btn-small" type="button" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.2);">
+            Clear All History
+          </button>
         </h2>
         <p class="desc-text" style="margin-bottom: 1.25rem;">Review previously validated datasets saved in your local SQLite history.</p>
 
@@ -794,6 +883,68 @@
       <!-- Detailed list of errors grouped by column -->
       <div id="panel-errors-container" class="panel-errors-container">
         <!-- Tables populated dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Processing Modal Overlay (Feature 7) -->
+  <div id="processing-modal-overlay" class="processing-modal-overlay hidden">
+    <div class="processing-modal-card">
+      <div class="processing-modal-spinner">
+        <div class="spinner-large"></div>
+      </div>
+      <h3 id="processing-stage-title">Initializing Engine...</h3>
+      <p id="processing-stage-desc">Preparing datasets and mapping validation constraints.</p>
+      
+      <div class="processing-progress-wrapper">
+        <div class="processing-progress-bar">
+          <div id="processing-progress-bar-fill" class="processing-progress-bar-fill" style="width: 0%;"></div>
+        </div>
+        <span id="processing-progress-percentage">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row Inspector Slide Drawer & Overlay (Feature 6) -->
+  <div id="row-inspector-overlay" class="details-panel-overlay"></div>
+  <div id="row-inspector-panel" class="details-panel">
+    <div class="panel-header">
+      <div>
+        <h2 id="row-inspector-title" style="font-weight: 800; font-size: 1.25rem; color: var(--text-heading); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 450px;">Row Inspector</h2>
+        <p id="row-inspector-subtitle" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 550; margin-top: 0.125rem;">Row details and normalization comparison</p>
+      </div>
+      <button id="row-inspector-close-btn" class="panel-close-btn" type="button" aria-label="Close inspector panel">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    
+    <div class="panel-body">
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;">
+        <button id="btn-row-inspector-copy" class="btn btn-secondary btn-small" type="button">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12" style="margin-right: 0.25rem;">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Copy Cleaned Fields
+         </button>
+      </div>
+
+      <!-- Values Comparison Grid -->
+      <div>
+        <h4 class="panel-group-title">Value Normalization Comparison</h4>
+        <div id="row-inspector-compare-container" class="row-inspector-compare-container">
+          <!-- Side by side original vs normalized grid values populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Validation Issues for the Row -->
+      <div>
+        <h4 class="panel-group-title">Validation Issues on this Row</h4>
+        <div id="row-inspector-issues-container" class="panel-errors-container">
+          <!-- Dynamic error lists -->
+        </div>
       </div>
     </div>
   </div>
