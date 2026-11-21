@@ -57,6 +57,24 @@ TransacShield solves this with a **zero-dependency, pure-function validation eng
 
 ---
 
+
+---
+
+## ⚡ Real-Time Fraud & Anomaly Detection Rules
+
+In addition to schema validation, TransacShield provides a modular fraud detection rule suite in `src/rules/`:
+
+1. **Velocity Check Engine (`src/rules/velocityCheck.js`)**:
+   - Implements sliding-window frequency and cumulative volume monitoring per account.
+   - Flags rapid micro-transaction bursts and sudden volume spikes within sub-minute intervals.
+
+2. **Geographical Impossible Travel Anomaly Detector (`src/rules/geographicalAnomaly.js`)**:
+   - Calculates Great-Circle distance via Haversine formula between consecutive geolocation coordinates.
+   - Flags physically impossible travel velocities (e.g. transactions across continents within minutes exceeding commercial airline speeds).
+
+3. **Sanctions & Blacklist Screening (`src/rules/blacklistRule.js`)**:
+   - Screen transactions against sanctioned jurisdictions (ISO-3166-1 alpha-2), flagged BIN ranges, and compromised account/email sets in $O(1)$ time.
+
 ## 🔌 API Reference
 
 ### Health Check
