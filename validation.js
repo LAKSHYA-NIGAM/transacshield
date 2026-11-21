@@ -34,6 +34,18 @@ const TransacValidationEngine = (function () {
       prefixes: ['65'],
       description: 'exactly 8 digits'
     },
+    US: {
+      digits: 10,
+      label: 'United States',
+      prefixes: ['1'],
+      description: 'exactly 10 digits'
+    },
+    UK: {
+      digits: 10,
+      label: 'United Kingdom',
+      prefixes: ['44'],
+      description: 'exactly 10 digits'
+    },
     GLOBAL: {
       minDigits: 7,
       maxDigits: 15,
@@ -110,7 +122,7 @@ const TransacValidationEngine = (function () {
   }
 
   function normalizeAmount(val) {
-    return trimValue(val).replace(/[$,₹€]/g, '');
+    return trimValue(val).replace(/[$,₹€]/g, '').trim();
   }
 
   // ═══════════════════════════════════════════
@@ -224,6 +236,8 @@ const TransacValidationEngine = (function () {
     const c = trimValue(rawCountry).toUpperCase();
     if (c === 'IN' || c === 'IND' || c === 'INDIA') return 'IN';
     if (c === 'SG' || c === 'SGP' || c === 'SINGAPORE') return 'SG';
+    if (c === 'US' || c === 'USA' || c === 'UNITED STATES') return 'US';
+    if (c === 'UK' || c === 'GB' || c === 'GBR' || c === 'UNITED KINGDOM') return 'UK';
     return 'GLOBAL';
   }
 
