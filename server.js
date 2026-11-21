@@ -20,6 +20,25 @@ app.use(compression());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  try {
+    const isDbAlive = db.prepare('SELECT 1').get();
+    res.json({
+      status: 'healthy',
+      uptime_seconds: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+      database: isDbAlive ? 'connected' : 'disconnected'
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'unhealthy',
+      database: 'disconnected',
+      error: err.message
+    });
+  }
+});
+
 // Serve static frontend files from the root directory
 app.use(express.static(__dirname));
 
@@ -232,6 +251,28 @@ app.get('/api/stats', (req, res) => {
     console.error('Database stats error:', err);
     res.status(500).json({ error: 'Failed to compute validation history statistics.' });
   }
+});
+
+// 404 handler for unmatched API routes
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `Endpoint ${req.method} ${req.originalUrl} not found` });
+});
+
+// Centralized error handling middleware
+app.use((err, req, res, next) => {
+  console.error('[Unhandled Error]', err);
+  const status = err.status || 500;
+  res.status(status).json({
+    error: err.message || 'Internal server error',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('[TransacShield] SIGTERM received. Closing database connection...');
+  try { db.close(); } catch (e) {}
+  process.exit(0);
 });
 
 // Start Server
