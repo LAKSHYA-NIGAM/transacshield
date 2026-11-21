@@ -558,4 +558,10 @@ const TransacValidationEngine = (function () {
 })();
 
 // Expose globally for other scripts
-window.TransacValidationEngine = TransacValidationEngine;
+// Expose for both Browser and Node.js environments
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = TransacValidationEngine;
+}
+if (typeof window !== 'undefined') {
+  window.TransacValidationEngine = TransacValidationEngine;
+}
