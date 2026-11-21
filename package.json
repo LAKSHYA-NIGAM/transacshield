@@ -1,19 +1,22 @@
 {
   "name": "transacshield",
   "version": "1.0.0",
-  "description": "Web-based transaction data validation and processing platform",
-  "main": "index.html",
+  "description": "High-throughput transaction data validation and normalization engine with SQLite persistence",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js & npx http-server -p 8085 -c-1"
+    "dev": "node server.js & npx http-server -p 8085 -c-1",
+    "test": "node --test tests/**/*.test.js"
   },
   "keywords": [
     "csv",
     "validation",
     "transaction",
-    "parser"
+    "parser",
+    "normalization",
+    "sqlite"
   ],
-  "author": "Antigravity",
+  "author": "Lakshya Nigam",
   "license": "ISC",
   "dependencies": {
     "better-sqlite3": "^12.11.1",
